@@ -13,3 +13,4 @@ trim_trailing_whitespace = false
 [src/assets/pixel/**]
 insert_final_newline = unset
 trim_trailing_whitespace = unset
+
