@@ -24,3 +24,7 @@ dist-ssr
 
 # 내부 문서 (기획·지시서·보고서·리뷰): 로컬 전용
 docs/
+
+# 에이전트 규칙 파일: 로컬 전용
+CLAUDE.md
+AGENTS.md
