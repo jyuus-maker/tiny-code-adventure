@@ -1,0 +1,12 @@
+// Pixelcode · RGBA palette, original grid coordinates
+type PixelAsset = { id: string; name: string; row: number; col: number; width: number; height: number; pixels?: number[]; runs?: [number,number,number][] };
+type PixelProjectData = {version: number; name: string; rows: number; columns: number; palette: number[][]; assets: PixelAsset[]};
+export const project: PixelProjectData = {"version":2,"name":"새 픽셀 프로젝트","columns":6,"rows":4,"palette":[[0,0,0,0],[85,76,71,255],[233,224,202,255]],"assets":[{"id":"274c80cb-6e79-454d-bbf3-3b62e63f673f","name":"item-bone-fragment-64.png","row":2,"col":3,"width":64,"height":64,"runs":[[1419,1,1],[1463,1,1],[1482,9,1],[1519,10,1],[1545,11,1],[1582,12,1],[1608,5,1],[1613,1,2],[1614,7,1],[1645,4,1],[1649,6,2],[1655,3,1],[1671,4,1],[1675,8,2],[1683,3,1],[1708,4,1],[1712,8,2],[1720,3,1],[1734,3,1],[1737,11,2],[1748,3,1],[1771,4,1],[1775,9,2],[1784,4,1],[1798,3,1],[1801,12,2],[1813,3,1],[1834,4,1],[1838,11,2],[1849,3,1],[1862,3,1],[1865,12,2],[1877,24,1],[1901,11,2],[1912,4,1],[1926,4,1],[1930,12,2],[1942,22,1],[1964,12,2],[1976,3,1],[1991,4,1],[1995,12,2],[2007,20,1],[2027,12,2],[2039,4,1],[2057,3,1],[2060,43,2],[2103,4,1],[2122,3,1],[2125,41,2],[2166,4,1],[2185,3,1],[2188,42,2],[2230,3,1],[2248,4,1],[2252,41,2],[2293,3,1],[2311,4,1],[2315,11,2],[2326,21,1],[2347,11,2],[2358,3,1],[2375,3,1],[2378,11,2],[2389,23,1],[2412,11,2],[2423,3,1],[2439,3,1],[2442,10,2],[2452,4,1],[2473,4,1],[2477,11,2],[2488,3,1],[2502,3,1],[2505,10,2],[2515,4,1],[2538,4,1],[2542,11,2],[2553,3,1],[2566,4,1],[2570,8,2],[2578,4,1],[2603,4,1],[2607,9,2],[2616,4,1],[2630,4,1],[2634,7,2],[2641,4,1],[2667,5,1],[2672,8,2],[2680,3,1],[2695,4,1],[2699,1,2],[2700,8,1],[2732,5,1],[2737,6,2],[2743,4,1],[2761,10,1],[2797,5,1],[2802,5,2],[2807,3,1],[2826,5,1],[2863,11,1],[2891,1,1],[2930,5,1],[2996,1,1]]}]};
+export function getImage(row: number, col: number) { return project.assets.find(a => a.row === row && a.col === col); }
+export function drawImage(ctx: CanvasRenderingContext2D, row: number, col: number, x = 0, y = 0) {
+ const asset = getImage(row, col); if (!asset) return;
+ const image = ctx.createImageData(asset.width, asset.height);
+ if (asset.runs) { for (const [offset,length,index] of asset.runs) for(let i=offset;i<offset+length;i++) image.data.set(project.palette[index],i*4); }
+ else asset.pixels?.forEach((index, i) => image.data.set(project.palette[index], i * 4));
+ ctx.putImageData(image, x, y);
+}
