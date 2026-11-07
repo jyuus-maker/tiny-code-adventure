@@ -6,7 +6,8 @@ import {
   REGION_TO_LANGUAGE,
   type Region,
 } from '../config';
-import { getAllAssets } from '../render/assets';
+import { getAllAssets, getAsset } from '../render/assets';
+import { CRACK_EFFECT_ID, ItemSprite } from '../render/ItemSprite';
 import { getAssetRects } from '../render/pixel';
 import { PixelSprite } from '../render/PixelSprite';
 import {
@@ -16,9 +17,20 @@ import {
   isRegionPaletteTarget,
   rgbToHex,
 } from '../render/region';
-import type { PixelRect, RegisteredPixelAsset } from '../render/types';
+import type {
+  ItemGrade,
+  PixelRect,
+  RegisteredPixelAsset,
+} from '../render/types';
+
+const ITEM_GRADES: readonly ItemGrade[] = [
+  'shining',
+  'normal',
+  'broken',
+] as const;
 
 const MOB_ITEM_PAIRS: readonly [mobId: string, itemId: string][] = [
+
   ['mob-grass-slime-64', 'item-jelly-64'],
   ['mob-moss-golem-64', 'item-stone-griddle-64'],
   ['mob-stone-shell-turtle-64', 'item-shell-shard-64'],
@@ -96,7 +108,58 @@ function countChangedOpaqueColors(
   return { opaqueCount, changedCount };
 }
 
+function countCrackOverlapPixels(itemId: string): number {
+  const itemAsset = getAsset(itemId);
+  const crackAsset = getAsset(CRACK_EFFECT_ID);
+  if (!itemAsset || !crackAsset) {
+    return 0;
+  }
+
+  const itemWidth = itemAsset.width;
+  const itemHeight = itemAsset.height;
+  const itemOpaque = new Uint8Array(itemWidth * itemHeight);
+
+  for (const r of getAssetRects(itemId)) {
+    const color = itemAsset.palette[r.p];
+    if (!color || color[3] === 0) continue;
+    for (let dy = 0; dy < r.h; dy++) {
+      const iy = r.y + dy;
+      if (iy < 0 || iy >= itemHeight) continue;
+      const rowOffset = iy * itemWidth;
+      for (let dx = 0; dx < r.w; dx++) {
+        const ix = r.x + dx;
+        if (ix >= 0 && ix < itemWidth) {
+          itemOpaque[rowOffset + ix] = 1;
+        }
+      }
+    }
+  }
+
+  const offsetX = Math.floor((itemWidth - crackAsset.width) / 2);
+  const offsetY = Math.floor((itemHeight - crackAsset.height) / 2);
+  let overlap = 0;
+
+  for (const r of getAssetRects(CRACK_EFFECT_ID)) {
+    const color = crackAsset.palette[r.p];
+    if (!color || color[3] === 0) continue;
+    for (let dy = 0; dy < r.h; dy++) {
+      const iy = r.y + dy + offsetY;
+      if (iy < 0 || iy >= itemHeight) continue;
+      const rowOffset = iy * itemWidth;
+      for (let dx = 0; dx < r.w; dx++) {
+        const ix = r.x + dx + offsetX;
+        if (ix >= 0 && ix < itemWidth && itemOpaque[rowOffset + ix] === 1) {
+          overlap++;
+        }
+      }
+    }
+  }
+
+  return overlap;
+}
+
 export function RenderCheck() {
+
   const [region, setRegion] = useState<Region>('warm');
   const [isNight, setIsNight] = useState(false);
 
@@ -174,7 +237,15 @@ export function RenderCheck() {
     return rows;
   }, []);
 
+  const itemGradeRows = useMemo(() => {
+    return MOB_ITEM_PAIRS.map(([, itemId]) => ({
+      itemId,
+      crackPixels: countCrackOverlapPixels(itemId),
+    }));
+  }, []);
+
   return (
+
     <div style={{ padding: '24px', fontFamily: 'system-ui, sans-serif' }}>
       <h1 style={{ fontSize: '24px', marginBottom: '16px' }}>
         픽셀 렌더러 & 지역 메서드 검증 (RenderCheck)
@@ -358,8 +429,79 @@ export function RenderCheck() {
 
       <section style={{ marginBottom: '32px' }}>
         <h2 style={{ fontSize: '18px', marginBottom: '8px' }}>
+          아이템 등급 ({region} / {isNight ? '밤' : '낮'})
+        </h2>
+        <div
+          style={{
+            display: 'inline-flex',
+            flexDirection: 'column',
+            gap: '12px',
+            padding: '16px',
+            background: '#1e293b',
+            borderRadius: '8px',
+            filter: isNight ? NIGHT_CSS_FILTER : undefined,
+          }}
+        >
+          {itemGradeRows.map(({ itemId, crackPixels }) => (
+            <div
+              key={itemId}
+              style={{
+                display: 'flex',
+                gap: '24px',
+                alignItems: 'center',
+                borderBottom: '1px solid #334155',
+                paddingBottom: '8px',
+              }}
+            >
+              <code
+                style={{
+                  color: '#f8fafc',
+                  background: 'transparent',
+                  minWidth: '210px',
+                }}
+              >
+                {itemId}
+              </code>
+              {ITEM_GRADES.map((grade) => (
+                <div
+                  key={grade}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <ItemSprite
+                    id={itemId}
+                    grade={grade}
+                    region={region}
+                    scale={DEFAULT_SCALE}
+                  />
+                  <span style={{ color: '#cbd5e1', fontSize: '12px' }}>
+                    {grade}
+                  </span>
+                </div>
+              ))}
+              <div
+                style={{
+                  color: '#f8fafc',
+                  fontSize: '13px',
+                  minWidth: '150px',
+                }}
+              >
+                크랙 표시 픽셀 수: <strong>{crackPixels}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '18px', marginBottom: '8px' }}>
           타이틀 배경 (원본, 지역·낮밤 무관)
         </h2>
+
         <div
           style={{
             display: 'inline-block',

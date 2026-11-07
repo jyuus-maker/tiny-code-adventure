@@ -22,3 +22,10 @@ export const NIGHT_CSS_FILTER = 'brightness(0.65) saturate(0.8) hue-rotate(-15de
 // TEMP: 디자인 확정 전 초안 (기본 표시 배율 scale 값)
 export const DEFAULT_SCALE = 2;
 
+// TEMP: 디자인 확정 전 초안 (부서진 등급 아이템 팔레트 채도·밝기 배율)
+export const BROKEN_ITEM_SATURATION_SCALE = 0.6;
+
+// TEMP: 디자인 확정 전 초안 (부서진 등급 아이템 팔레트 밝기 배율)
+export const BROKEN_ITEM_LIGHTNESS_SCALE = 0.85;
+
+

@@ -1,12 +1,47 @@
 import { getAsset } from './assets';
 import { getAssetRects, rgbaToCss } from './pixel';
 
+export type PixelRectsGroupProps = {
+  id: string;
+  palette?: number[][];
+};
+
+export function PixelRectsGroup({ id, palette }: PixelRectsGroupProps) {
+  const asset = getAsset(id);
+  if (!asset) {
+    return null;
+  }
+
+  const rects = getAssetRects(id);
+  const activePalette = palette ?? asset.palette;
+
+  return (
+    <g>
+      {rects.map((rect, idx) => {
+        const color = activePalette[rect.p];
+        if (!color || color[3] === 0) return null;
+        return (
+          <rect
+            key={idx}
+            x={rect.x}
+            y={rect.y}
+            width={rect.w}
+            height={rect.h}
+            fill={rgbaToCss(color)}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
 export type PixelSpriteProps = {
   id: string;
   palette?: number[][];
   scale: number;
   flip?: boolean;
 };
+
 
 export function PixelSprite({
   id,

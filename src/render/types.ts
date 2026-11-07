@@ -28,6 +28,8 @@ export type PixelRect = {
   p: number;
 };
 
+export type ItemGrade = 'shining' | 'normal' | 'broken';
+
 export type RegisteredPixelAsset = {
   id: string;
   size: number;
@@ -37,4 +39,5 @@ export type RegisteredPixelAsset = {
   palette: number[][];
   runs: PixelRun[];
 };
+
 
