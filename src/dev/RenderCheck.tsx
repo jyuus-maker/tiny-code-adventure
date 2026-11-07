@@ -6,7 +6,14 @@ import {
   REGION_TO_LANGUAGE,
   type Region,
 } from '../config';
+import { EVENTS } from '../data/events';
+import { getItemEffect } from '../data/itemEffect';
+import { ITEMS } from '../data/items';
+import { MOBS } from '../data/mobs';
+import type { ItemEffect } from '../data/types';
+import { validateContentData } from '../data/validate';
 import { getAllAssets, getAsset } from '../render/assets';
+
 import { getItemSparklePoints } from '../render/itemGrade';
 import { CRACK_EFFECT_ID, ItemSprite } from '../render/ItemSprite';
 
@@ -160,7 +167,18 @@ function countCrackOverlapPixels(itemId: string): number {
   return overlap;
 }
 
+function formatItemEffect(effect: ItemEffect): string {
+  if (effect.kind === 'score') {
+    return 'score (점수 획득)';
+  }
+  if (effect.kind === 'permanent') {
+    return `${effect.stat} 영구 상승`;
+  }
+  return `${effect.stat} 임시 버프 (다음 ${effect.battles}전투)`;
+}
+
 export function RenderCheck() {
+
 
   const [region, setRegion] = useState<Region>('warm');
   const [isNight, setIsNight] = useState(false);
@@ -247,8 +265,11 @@ export function RenderCheck() {
     }));
   }, []);
 
+  const itemMap = useMemo(() => new Map(ITEMS.map((i) => [i.id, i])), []);
+  const validationResults = useMemo(() => validateContentData(), []);
 
   return (
+
 
     <div style={{ padding: '24px', fontFamily: 'system-ui, sans-serif' }}>
       <h1 style={{ fontSize: '24px', marginBottom: '16px' }}>
@@ -533,8 +554,307 @@ export function RenderCheck() {
       </section>
 
       <section style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '20px', marginBottom: '12px' }}>
+          콘텐츠 데이터 (src/data)
+        </h2>
+
+        <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>
+          1) 연결 검사 결과 ({validationResults.length}항목)
+        </h3>
+        <table
+          style={{
+            borderCollapse: 'collapse',
+            width: '100%',
+            maxWidth: '960px',
+            fontSize: '14px',
+            marginBottom: '24px',
+          }}
+        >
+          <thead>
+            <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                검사 항목
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                상세
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                결과
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {validationResults.map((v) => (
+              <tr key={v.id}>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  {v.label}
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  {v.detail}
+                </td>
+                <td
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '8px',
+                    fontWeight: 'bold',
+                    color: v.pass ? '#16a34a' : '#dc2626',
+                  }}
+                >
+                  {v.pass ? 'PASS' : 'FAIL'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>
+          2) 몹 목록 ({MOBS.length}종 — 선택 지역: {region} /{' '}
+          {isNight ? '밤' : '낮'})
+        </h3>
+        <table
+          style={{
+            borderCollapse: 'collapse',
+            width: '100%',
+            maxWidth: '960px',
+            fontSize: '14px',
+            marginBottom: '24px',
+          }}
+        >
+          <thead>
+            <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                그림 ({region})
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                기본 이름 (id)
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                시간대
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                타입
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                전용템 그림 ({region})
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                전용템 보상
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {MOBS.map((mob) => {
+              const exItem = itemMap.get(mob.exclusiveItemId);
+              return (
+                <tr key={mob.id}>
+                  <td
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      padding: '8px',
+                      background: '#1e293b',
+                      filter: isNight ? NIGHT_CSS_FILTER : undefined,
+                    }}
+                  >
+                    <PixelSprite
+                      id={mob.assetId}
+                      palette={getAssetRegionPalette(mob.assetId, region)}
+                      scale={1}
+                    />
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    <strong>{mob.name}</strong> (<code>{mob.id}</code>)
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    <code>{mob.time}</code>
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    <code>{mob.type}</code>
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      padding: '8px',
+                      background: '#1e293b',
+                      filter: isNight ? NIGHT_CSS_FILTER : undefined,
+                    }}
+                  >
+                    {exItem && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          color: '#f8fafc',
+                        }}
+                      >
+                        <PixelSprite
+                          id={exItem.assetId}
+                          palette={getAssetRegionPalette(
+                            exItem.assetId,
+                            region,
+                          )}
+                          scale={1}
+                        />
+                        <span>
+                          {exItem.name} (<code>{exItem.id}</code>)
+                        </span>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    <code>{exItem?.reward ?? '-'}</code>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>
+          3) 아이템 목록 및 등급별 효과 ({ITEMS.length}종)
+        </h3>
+        <table
+          style={{
+            borderCollapse: 'collapse',
+            width: '100%',
+            maxWidth: '960px',
+            fontSize: '14px',
+            marginBottom: '24px',
+          }}
+        >
+          <thead>
+            <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                이름 (id)
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                원천 몹
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                미션 장면
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                빛나는 (shining) 효과
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                일반 (normal) 효과
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                부서진 (broken) 효과
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {ITEMS.map((item) => (
+              <tr key={item.id}>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  <strong>{item.name}</strong> (<code>{item.id}</code>)
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  <code>{item.sourceMobId}</code>
+                </td>
+                <td
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '8px',
+                    background: '#1e293b',
+                  }}
+                >
+                  <PixelSprite id={item.missionSceneAssetId} scale={1} />
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  {formatItemEffect(getItemEffect(item, 'shining'))}
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  {formatItemEffect(getItemEffect(item, 'normal'))}
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  {formatItemEffect(getItemEffect(item, 'broken'))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>
+          4) 이벤트 목록 ({EVENTS.length}종)
+        </h3>
+        <table
+          style={{
+            borderCollapse: 'collapse',
+            width: '100%',
+            maxWidth: '960px',
+            fontSize: '14px',
+          }}
+        >
+          <thead>
+            <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                장면 그림
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                아이콘
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                장소명 (id)
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                passable
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                분기 여부 (branch)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {EVENTS.map((ev) => (
+              <tr key={ev.id}>
+                <td
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '8px',
+                    background: '#1e293b',
+                  }}
+                >
+                  <PixelSprite id={ev.sceneAssetId} scale={1} />
+                </td>
+                <td
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    padding: '8px',
+                    background: '#1e293b',
+                    color: '#cbd5e1',
+                  }}
+                >
+                  {ev.iconAssetIds && ev.iconAssetIds.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {ev.iconAssetIds.map((iconId) => (
+                        <PixelSprite key={iconId} id={iconId} scale={1} />
+                      ))}
+                    </div>
+                  ) : (
+                    '(없음)'
+                  )}
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  <strong>{ev.name}</strong> (<code>{ev.id}</code>)
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  <code>{String(ev.passable)}</code>
+                </td>
+                <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  <code>{String(ev.branch)}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section style={{ marginBottom: '32px' }}>
         <h2 style={{ fontSize: '18px', marginBottom: '8px' }}>
           비대상 에셋 색 매핑 충돌 점검 (적용 제외 에셋 중 매핑 표 원본 색 포함 목록)
+
         </h2>
         {collisionRows.length === 0 ? (
           <p style={{ fontSize: '14px' }}>

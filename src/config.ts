@@ -38,5 +38,10 @@ export const SHINING_SPARKLE_SIZE_RATIOS: readonly [number, number, number] = [
 // TEMP: 디자인 확정 전 초안 (빛나는 등급 반짝임 주기 ms)
 export const SHINING_SPARKLE_PERIOD_MS = 1600;
 
+// TEMP: 조율 전 초안 (일반·부서진 등급 아이템 임시 버프 유지 전투 수)
+export const NORMAL_ITEM_BUFF_BATTLES = 2;
+export const BROKEN_ITEM_BUFF_BATTLES = 1;
+
+
 
 
