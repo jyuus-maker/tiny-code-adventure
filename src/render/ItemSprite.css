@@ -3,7 +3,7 @@
   100% {
     opacity: 0;
   }
-  50% {
+  10% {
     opacity: 1;
   }
 }
@@ -11,7 +11,7 @@
 .item-sparkle-twinkle {
   opacity: 0;
   animation-name: item-sparkle-twinkle;
-  animation-timing-function: ease-in-out;
+  animation-timing-function: ease-out;
   animation-iteration-count: infinite;
 }
 
