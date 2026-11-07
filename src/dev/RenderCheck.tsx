@@ -4,8 +4,10 @@ import {
   NIGHT_CSS_FILTER,
   REGIONS,
   REGION_TO_LANGUAGE,
+  type CodeLanguage,
   type Region,
 } from '../config';
+import { renderCode } from '../data/codeRender';
 import { EVENTS } from '../data/events';
 import { getItemEffect } from '../data/itemEffect';
 import { ITEMS } from '../data/items';
@@ -13,6 +15,8 @@ import { MOBS } from '../data/mobs';
 import type { ItemEffect } from '../data/types';
 import { validateContentData } from '../data/validate';
 import { getAllAssets, getAsset } from '../render/assets';
+import { CODE_SAMPLES } from './codeSamples';
+
 
 import { getItemSparklePoints } from '../render/itemGrade';
 import { CRACK_EFFECT_ID, ItemSprite } from '../render/ItemSprite';
@@ -37,6 +41,21 @@ const ITEM_GRADES: readonly ItemGrade[] = [
   'normal',
   'broken',
 ] as const;
+
+const CODE_LANGUAGES: readonly CodeLanguage[] = ['Java', 'JS', 'TS'] as const;
+
+function isExactLinesMatch(actual: string[], expected: string[]): boolean {
+  if (actual.length !== expected.length) {
+    return false;
+  }
+  for (let i = 0; i < actual.length; i++) {
+    if (actual[i] !== expected[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 
 const MOB_ITEM_PAIRS: readonly [mobId: string, itemId: string][] = [
 
@@ -555,8 +574,133 @@ export function RenderCheck() {
 
       <section style={{ marginBottom: '32px' }}>
         <h2 style={{ fontSize: '20px', marginBottom: '12px' }}>
+          코드 렌더러 (src/data/codeRender.ts — 현재 지역 언어:{' '}
+          {REGION_TO_LANGUAGE[region]})
+        </h2>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            maxWidth: '960px',
+          }}
+        >
+          {CODE_SAMPLES.map((sample) => {
+            const activeLang = REGION_TO_LANGUAGE[region];
+            return (
+              <div
+                key={sample.id}
+                style={{
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  background: '#f8fafc',
+                }}
+              >
+                <h3 style={{ fontSize: '16px', margin: '0 0 12px 0' }}>
+                  {sample.title} (<code>{sample.id}</code>)
+                </h3>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gap: '12px',
+                  }}
+                >
+                  {CODE_LANGUAGES.map((lang) => {
+                    const renderedLines = renderCode(sample.code, lang);
+                    const expectedLines = sample.expected[lang];
+                    const pass = isExactLinesMatch(
+                      renderedLines,
+                      expectedLines,
+                    );
+                    const isActive = lang === activeLang;
+                    return (
+                      <div
+                        key={lang}
+                        style={{
+                          border: isActive
+                            ? '2px solid #2563eb'
+                            : '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          background: isActive ? '#eff6ff' : '#ffffff',
+                          padding: '10px',
+                          boxShadow: isActive
+                            ? '0 0 0 2px rgba(37, 99, 235, 0.15)'
+                            : undefined,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                            fontSize: '13px',
+                          }}
+                        >
+                          <div>
+                            <strong>{lang}</strong>
+                            {isActive && (
+                              <span
+                                style={{
+                                  marginLeft: '6px',
+                                  padding: '2px 6px',
+                                  background: '#2563eb',
+                                  color: '#ffffff',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
+                                선택 지역 ({region})
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <span style={{ color: '#475569' }}>
+                              {renderedLines.length}줄
+                            </span>
+                            <strong
+                              style={{
+                                color: pass ? '#16a34a' : '#dc2626',
+                              }}
+                            >
+                              {pass ? 'PASS' : 'FAIL'}
+                            </strong>
+                          </div>
+                        </div>
+                        <pre
+                          style={{
+                            margin: 0,
+                            padding: '10px',
+                            background: '#0f172a',
+                            color: '#f8fafc',
+                            borderRadius: '4px',
+                            fontFamily:
+                              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                            fontSize: '13px',
+                            lineHeight: 1.5,
+                            overflowX: 'auto',
+                          }}
+                        >
+                          {renderedLines.join('\n')}
+                        </pre>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '20px', marginBottom: '12px' }}>
           콘텐츠 데이터 (src/data)
         </h2>
+
 
         <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>
           1) 연결 검사 결과 ({validationResults.length}항목)
