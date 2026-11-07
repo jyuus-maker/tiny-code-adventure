@@ -7,7 +7,9 @@ import {
   type Region,
 } from '../config';
 import { getAllAssets, getAsset } from '../render/assets';
+import { getItemSparklePoints } from '../render/itemGrade';
 import { CRACK_EFFECT_ID, ItemSprite } from '../render/ItemSprite';
+
 import { getAssetRects } from '../render/pixel';
 import { PixelSprite } from '../render/PixelSprite';
 import {
@@ -241,8 +243,10 @@ export function RenderCheck() {
     return MOB_ITEM_PAIRS.map(([, itemId]) => ({
       itemId,
       crackPixels: countCrackOverlapPixels(itemId),
+      sparklePoints: getItemSparklePoints(itemId),
     }));
   }, []);
+
 
   return (
 
@@ -442,7 +446,7 @@ export function RenderCheck() {
             filter: isNight ? NIGHT_CSS_FILTER : undefined,
           }}
         >
-          {itemGradeRows.map(({ itemId, crackPixels }) => (
+          {itemGradeRows.map(({ itemId, crackPixels, sparklePoints }) => (
             <div
               key={itemId}
               style={{
@@ -487,13 +491,27 @@ export function RenderCheck() {
                 style={{
                   color: '#f8fafc',
                   fontSize: '13px',
-                  minWidth: '150px',
+                  minWidth: '240px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
                 }}
               >
-                크랙 표시 픽셀 수: <strong>{crackPixels}</strong>
+                <div>
+                  반짝임 점 3개:{' '}
+                  <strong>
+                    {sparklePoints
+                      .map((pt) => `(${pt.x}, ${pt.y})`)
+                      .join(', ')}
+                  </strong>
+                </div>
+                <div>
+                  크랙 표시 픽셀 수: <strong>{crackPixels}</strong>
+                </div>
               </div>
             </div>
           ))}
+
         </div>
       </section>
 

@@ -28,4 +28,15 @@ export const BROKEN_ITEM_SATURATION_SCALE = 0.6;
 // TEMP: 디자인 확정 전 초안 (부서진 등급 아이템 팔레트 밝기 배율)
 export const BROKEN_ITEM_LIGHTNESS_SCALE = 0.85;
 
+// TEMP: 디자인 확정 전 초안 (빛나는 등급 반짝임 크기 - 아이템 폭 대비 비율 3개)
+export const SHINING_SPARKLE_SIZE_RATIOS: readonly [number, number, number] = [
+  0.35,
+  0.25,
+  0.18,
+] as const;
+
+// TEMP: 디자인 확정 전 초안 (빛나는 등급 반짝임 주기 ms)
+export const SHINING_SPARKLE_PERIOD_MS = 1600;
+
+
 

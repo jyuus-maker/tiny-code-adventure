@@ -2,6 +2,16 @@ import {
   BROKEN_ITEM_LIGHTNESS_SCALE,
   BROKEN_ITEM_SATURATION_SCALE,
 } from '../config';
+import { getAsset } from './assets';
+import { getAssetRects } from './pixel';
+
+export type SparklePoint = {
+  x: number;
+  y: number;
+};
+
+const sparklePointsCache = new Map<string, SparklePoint[]>();
+
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   const rn = r / 255;
@@ -74,3 +84,111 @@ export function buildBrokenItemPalette(palette: number[][]): number[][] {
     return [nr, ng, nb, a];
   });
 }
+
+export function getItemSparklePoints(assetId: string): SparklePoint[] {
+  const cached = sparklePointsCache.get(assetId);
+  if (cached) {
+    return cached;
+  }
+
+  const asset = getAsset(assetId);
+  if (!asset) {
+    return [];
+  }
+
+  const { width, height, palette } = asset;
+  const opaque = new Uint8Array(width * height);
+
+  for (const r of getAssetRects(assetId)) {
+    const color = palette[r.p];
+    if (!color || color[3] === 0) continue;
+    for (let dy = 0; dy < r.h; dy++) {
+      const y = r.y + dy;
+      if (y < 0 || y >= height) continue;
+      const rowOffset = y * width;
+      for (let dx = 0; dx < r.w; dx++) {
+        const x = r.x + dx;
+        if (x >= 0 && x < width) {
+          opaque[rowOffset + x] = 1;
+        }
+      }
+    }
+  }
+
+  const isOpaque = (x: number, y: number): boolean => {
+    if (x < 0 || x >= width || y < 0 || y >= height) {
+      return false;
+    }
+    return opaque[y * width + x] === 1;
+  };
+
+  const edgePixels: SparklePoint[] = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!isOpaque(x, y)) continue;
+      if (
+        !isOpaque(x, y - 1) ||
+        !isOpaque(x, y + 1) ||
+        !isOpaque(x - 1, y) ||
+        !isOpaque(x + 1, y)
+      ) {
+        edgePixels.push({ x, y });
+      }
+    }
+  }
+
+  if (edgePixels.length === 0) {
+    sparklePointsCache.set(assetId, []);
+    return [];
+  }
+
+  let firstIdx = 0;
+  let bestScore = edgePixels[0].x - edgePixels[0].y;
+  let bestY = edgePixels[0].y;
+
+  for (let i = 1; i < edgePixels.length; i++) {
+    const pt = edgePixels[i];
+    const score = pt.x - pt.y;
+    if (score > bestScore || (score === bestScore && pt.y < bestY)) {
+      bestScore = score;
+      bestY = pt.y;
+      firstIdx = i;
+    }
+  }
+
+  const chosen: SparklePoint[] = [edgePixels[firstIdx]];
+  const usedIndices = new Set<number>([firstIdx]);
+
+  while (chosen.length < 3 && chosen.length < edgePixels.length) {
+    let bestIdx = -1;
+    let maxMinDistSq = -1;
+
+    for (let i = 0; i < edgePixels.length; i++) {
+      if (usedIndices.has(i)) continue;
+      const candidate = edgePixels[i];
+      let minDistSq = Infinity;
+
+      for (const picked of chosen) {
+        const dx = candidate.x - picked.x;
+        const dy = candidate.y - picked.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < minDistSq) {
+          minDistSq = distSq;
+        }
+      }
+
+      if (minDistSq > maxMinDistSq) {
+        maxMinDistSq = minDistSq;
+        bestIdx = i;
+      }
+    }
+
+    if (bestIdx === -1) break;
+    usedIndices.add(bestIdx);
+    chosen.push(edgePixels[bestIdx]);
+  }
+
+  sparklePointsCache.set(assetId, chosen);
+  return chosen;
+}
+
