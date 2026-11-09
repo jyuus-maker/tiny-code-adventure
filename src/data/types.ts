@@ -77,13 +77,13 @@ export type CodeExpr =
 export type CodeIf = {
   kind: 'if';
   condition: CodeExpr;
-  thenComment?: string;
-  elseComment?: string;
+  thenRate: number;
+  elseRate?: number;
 };
 
 export type CodeSwitchCase = {
   match: string;
-  comment?: string;
+  rate: number;
 };
 
 export type CodeSwitch = {
@@ -95,7 +95,9 @@ export type CodeSwitch = {
 export type NeutralCode = {
   vars: CodeVar[];
   body: CodeIf | CodeSwitch;
+  resultVar?: string;
 };
+
 
 export type EventOutcome = {
   weight: number;

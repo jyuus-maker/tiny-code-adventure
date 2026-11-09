@@ -7,7 +7,7 @@ import {
   type CodeLanguage,
   type Region,
 } from '../config';
-import { renderCode } from '../data/codeRender';
+import { getCodeQaStats, renderCode } from '../data/codeRender';
 import { EVENTS } from '../data/events';
 import { getItemEffect } from '../data/itemEffect';
 import { ITEMS } from '../data/items';
@@ -587,6 +587,7 @@ export function RenderCheck() {
         >
           {CODE_SAMPLES.map((sample) => {
             const activeLang = REGION_TO_LANGUAGE[region];
+            const qaStats = getCodeQaStats(sample.code);
             return (
               <div
                 key={sample.id}
@@ -597,9 +598,47 @@ export function RenderCheck() {
                   background: '#f8fafc',
                 }}
               >
-                <h3 style={{ fontSize: '16px', margin: '0 0 12px 0' }}>
-                  {sample.title} (<code>{sample.id}</code>)
-                </h3>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '12px',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                  }}
+                >
+                  <h3 style={{ fontSize: '16px', margin: 0 }}>
+                    {sample.title} (<code>{sample.id}</code>)
+                  </h3>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'center',
+                      fontSize: '13px',
+                      color: '#334155',
+                    }}
+                  >
+                    <span>
+                      최대 줄 수: <strong>{qaStats.maxLines}</strong>
+                    </span>
+                    <span>
+                      논리 연산자 수: <strong>{qaStats.logicalOpCount}</strong>
+                    </span>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        background: qaStats.needsReview ? '#fef3c7' : '#dcfce7',
+                        color: qaStats.needsReview ? '#b45309' : '#15803d',
+                      }}
+                    >
+                      {qaStats.needsReview ? '검수 대상' : '검수 대상 아님'}
+                    </span>
+                  </div>
+                </div>
                 <div
                   style={{
                     display: 'grid',

@@ -42,6 +42,11 @@ export const SHINING_SPARKLE_PERIOD_MS = 1600;
 export const NORMAL_ITEM_BUFF_BATTLES = 2;
 export const BROKEN_ITEM_BUFF_BATTLES = 1;
 
+// TEMP: 조율 전 초안 (코드 QA 검수 기준값: 최대 줄 수, 최대 논리 연산자 수)
+export const CODE_QA_MAX_LINES = 6;
+export const CODE_QA_MAX_LOGICAL_OPS = 3;
+
+
 
 
 
