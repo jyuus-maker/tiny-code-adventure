@@ -7,6 +7,13 @@ import {
   type CodeLanguage,
   type Region,
 } from '../config';
+import {
+  ALTAR_BLESSING_TEXT,
+  ALTAR_CURSE_TEXT,
+  ALTAR_INSCRIPTIONS,
+  ALTAR_SITUATION_TEXT,
+  resolveAltarChoice,
+} from '../data/altar';
 import { CLIENTS } from '../data/clients';
 import { getCodeQaStats, renderCode } from '../data/codeRender';
 import { EVENTS } from '../data/events';
@@ -14,7 +21,7 @@ import { getItemEffect } from '../data/itemEffect';
 import { ITEMS } from '../data/items';
 import { MISSIONS } from '../data/missions';
 import { MOBS } from '../data/mobs';
-import type { ItemEffect } from '../data/types';
+import type { AltarOutcome, ItemEffect } from '../data/types';
 import { validateContentData } from '../data/validate';
 import { getAllAssets, getAsset } from '../render/assets';
 import { CODE_SAMPLES } from './codeSamples';
@@ -196,6 +203,16 @@ function formatItemEffect(effect: ItemEffect): string {
     return `${effect.stat} 영구 상승`;
   }
   return `${effect.stat} 임시 버프 (다음 ${effect.battles}전투)`;
+}
+
+function formatAltarOutcome(outcome: AltarOutcome): string {
+  if (outcome.kind === 'blessing') {
+    return `축복 +${outcome.amount}`;
+  }
+  if (outcome.kind === 'curse') {
+    return `저주 −${Math.abs(outcome.amount)}`;
+  }
+  return 'none';
 }
 
 export function RenderCheck() {
@@ -739,6 +756,192 @@ export function RenderCheck() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '20px', marginBottom: '12px' }}>
+          고대 제단 (src/data/altar.ts — 현재 선택 지역: {region})
+        </h2>
+        <div
+          style={{
+            border: '1px solid #cbd5e1',
+            borderRadius: '8px',
+            padding: '16px',
+            background: '#f8fafc',
+            maxWidth: '960px',
+          }}
+        >
+          <div style={{ fontSize: '14px', marginBottom: '12px' }}>
+            <div>
+              <strong>지문:</strong> {ALTAR_SITUATION_TEXT}
+            </div>
+            <div>
+              <strong>축복 문구:</strong> {ALTAR_BLESSING_TEXT} /{' '}
+              <strong>저주 문구:</strong> {ALTAR_CURSE_TEXT}
+            </div>
+          </div>
+
+          {ALTAR_INSCRIPTIONS.map((inscription) => {
+            const activeLang = REGION_TO_LANGUAGE[region];
+            return (
+              <div key={inscription.id} style={{ marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '16px', margin: '0 0 8px 0' }}>
+                  샘플 술식 3개 (<code>{inscription.id}</code> — 언어 이름 미표시)
+                </h3>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gap: '12px',
+                  }}
+                >
+                  {CODE_LANGUAGES.map((lang, idx) => {
+                    const isAnswer = lang === activeLang;
+                    return (
+                      <div
+                        key={lang}
+                        style={{
+                          border: isAnswer
+                            ? '2px solid #16a34a'
+                            : '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          background: isAnswer ? '#f0fdf4' : '#ffffff',
+                          padding: '10px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                            fontSize: '13px',
+                          }}
+                        >
+                          <strong>술식 #{idx + 1}</strong>
+                          {isAnswer && (
+                            <span
+                              style={{
+                                padding: '2px 6px',
+                                background: '#16a34a',
+                                color: '#ffffff',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              현재 지역({region}) 정답 술식
+                            </span>
+                          )}
+                        </div>
+                        <pre
+                          style={{
+                            margin: 0,
+                            padding: '10px',
+                            background: '#0f172a',
+                            color: '#f8fafc',
+                            borderRadius: '4px',
+                            fontFamily:
+                              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                            fontSize: '13px',
+                            lineHeight: 1.5,
+                            overflowX: 'auto',
+                          }}
+                        >
+                          {inscription.snippets[lang].join('\n')}
+                        </pre>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <h3 style={{ fontSize: '16px', margin: '0 0 8px 0' }}>
+            판정 표 (지역 3 × 고른 언어 3 = 9칸, currentStatValue = 5)
+          </h3>
+          <table
+            style={{
+              borderCollapse: 'collapse',
+              width: '100%',
+              fontSize: '14px',
+              background: '#ffffff',
+              marginBottom: '12px',
+            }}
+          >
+            <thead>
+              <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                  지역 (지역 언어)
+                </th>
+                {CODE_LANGUAGES.map((chosenLang) => (
+                  <th
+                    key={chosenLang}
+                    style={{ border: '1px solid #cbd5e1', padding: '8px' }}
+                  >
+                    고른 언어: {chosenLang}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {REGIONS.map((r) => {
+                const rLang = REGION_TO_LANGUAGE[r];
+                return (
+                  <tr key={r}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                      <strong>{r}</strong> (<code>{rLang}</code>)
+                    </td>
+                    {CODE_LANGUAGES.map((chosenLang) => {
+                      const outcome = resolveAltarChoice(
+                        chosenLang,
+                        rLang,
+                        'attack',
+                        5,
+                      );
+                      const isBlessing = outcome.kind === 'blessing';
+                      return (
+                        <td
+                          key={chosenLang}
+                          style={{
+                            border: '1px solid #cbd5e1',
+                            padding: '8px',
+                            fontWeight: 'bold',
+                            color: isBlessing ? '#16a34a' : '#dc2626',
+                          }}
+                        >
+                          {formatAltarOutcome(outcome)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {(() => {
+            const zeroCurseOutcome = resolveAltarChoice(
+              'Java',
+              'TS',
+              'attack',
+              0,
+            );
+            const pass = zeroCurseOutcome.kind === 'none';
+            return (
+              <div style={{ fontSize: '14px' }}>
+                <strong>
+                  하한 확인 (currentStatValue = 0에서 저주를 고른 경우):
+                </strong>{' '}
+                <code>{formatAltarOutcome(zeroCurseOutcome)}</code> —{' '}
+                <strong style={{ color: pass ? '#16a34a' : '#dc2626' }}>
+                  {pass ? 'PASS' : 'FAIL'}
+                </strong>
+              </div>
+            );
+          })()}
         </div>
       </section>
 

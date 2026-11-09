@@ -1,4 +1,4 @@
-import type { Region } from '../config';
+import type { CodeLanguage, Region } from '../config';
 
 export type TimeOfDay = 'day' | 'night';
 
@@ -152,3 +152,15 @@ export type Mission = {
   targetMobId?: string;
   targetItemId?: string;
 };
+
+export type ScrollKind = 'attack' | 'defense' | 'hp';
+
+export type AltarInscription = {
+  id: string;
+  snippets: Record<CodeLanguage, string[]>;
+};
+
+export type AltarOutcome =
+  | { kind: 'blessing'; stat: ScrollKind; amount: number }
+  | { kind: 'curse'; stat: ScrollKind; amount: number }
+  | { kind: 'none' };

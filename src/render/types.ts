@@ -32,6 +32,8 @@ export type ItemGrade = 'shining' | 'normal' | 'broken';
 
 export type RegisteredPixelAsset = {
   id: string;
+  filename: string;
+  assetCount: number;
   size: number;
   version: string | null;
   width: number;

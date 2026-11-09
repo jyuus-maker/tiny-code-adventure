@@ -1,4 +1,4 @@
-import { getAsset } from '../render/assets';
+import { getAllAssets, getAsset } from '../render/assets';
 import { CLIENTS } from './clients';
 import { EVENTS } from './events';
 import { ITEMS } from './items';
@@ -263,6 +263,39 @@ export function validateContentData(): ValidationCheckItem[] {
       duplicateMissionIds.length === 0
         ? `미션 ${MISSIONS.length}개 모두 고유 id 확인`
         : `중복 id: ${duplicateMissionIds.join(', ')}`,
+  });
+
+  // 10. 모든 픽셀코드 파일에 그림이 정확히 1장인가
+  const allAssets = getAllAssets();
+  const multiImageFiles = allAssets
+    .filter((a) => a.assetCount !== 1)
+    .map((a) => `${a.filename} (${a.assetCount}장)`);
+  results.push({
+    id: 'pixelcode-single-asset',
+    label: '모든 픽셀코드 파일에 그림이 정확히 1장인가',
+    pass: multiImageFiles.length === 0,
+    detail:
+      multiImageFiles.length === 0
+        ? `픽셀코드 파일 ${allAssets.length}개 모두 그림 1장 확인`
+        : `FAIL 파일: ${multiImageFiles.join(', ')}`,
+  });
+
+  // 11. 이벤트: 이벤트가 6종이고 'scroll'이 없는가
+  const eventErrors: string[] = [];
+  if (EVENTS.length !== 6) {
+    eventErrors.push(`이벤트 개수가 6종이 아님 (현재: ${EVENTS.length}종)`);
+  }
+  if (EVENTS.some((ev) => ev.id === 'scroll')) {
+    eventErrors.push(`삭제 대상인 'scroll' 이벤트가 남아 있음`);
+  }
+  results.push({
+    id: 'events-merged-check',
+    label: "이벤트: 이벤트가 6종이고 'scroll'이 없는가",
+    pass: eventErrors.length === 0,
+    detail:
+      eventErrors.length === 0
+        ? `이벤트 ${EVENTS.length}종 확인 ('scroll' 없음, 'altar'로 통합)`
+        : eventErrors.join('; '),
   });
 
   return results;

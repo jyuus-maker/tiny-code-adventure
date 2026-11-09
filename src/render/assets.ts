@@ -45,6 +45,8 @@ for (const [path, mod] of Object.entries(modules)) {
 
   assetMap.set(id, {
     id,
+    filename,
+    assetCount: project.assets.length,
     size,
     version,
     width: rawAsset.width,

@@ -46,6 +46,10 @@ export const BROKEN_ITEM_BUFF_BATTLES = 1;
 export const CODE_QA_MAX_LINES = 6;
 export const CODE_QA_MAX_LOGICAL_OPS = 3;
 
+// TEMP: 조율 전 초안 (고대 제단 축복 보상량 및 저주 비율)
+export const ALTAR_BLESSING_AMOUNT = 2;
+export const ALTAR_CURSE_RATIO = 0.5;
+
 
 
 

@@ -27,13 +27,6 @@ export const EVENTS: readonly EventCard[] = [
     id: 'altar',
     name: '고대 제단',
     sceneAssetId: 'event-altar-scene-128',
-    passable: true,
-    branch: false,
-  },
-  {
-    id: 'scroll',
-    name: '고대 주문서',
-    sceneAssetId: 'event-altar-scene-128',
     iconAssetIds: ['ui-scroll-64'],
     passable: true,
     branch: false,
