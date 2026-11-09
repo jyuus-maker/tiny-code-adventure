@@ -133,15 +133,22 @@ export type MissionEndings = {
   sad: string;
 };
 
+export type MissionClient = {
+  id: string;
+  name: string;
+  itemId: string;
+  sceneAssetId: string;
+  endings: MissionEndings;
+  failText: string;
+};
+
 export type Mission = {
   id: string;
+  clientId: string;
   kind: MissionKind;
   difficulty: MissionDifficulty;
+  count: number;
+  dialogue: string;
   targetMobId?: string;
   targetItemId?: string;
-  count?: number;
-  client?: string;
-  dialogue?: string;
-  endings?: MissionEndings;
-  failText?: string;
 };

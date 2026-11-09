@@ -1,4 +1,5 @@
 import { getAsset } from '../render/assets';
+import { CLIENTS } from './clients';
 import { EVENTS } from './events';
 import { ITEMS } from './items';
 import { MISSIONS } from './missions';
@@ -15,6 +16,7 @@ export function validateContentData(): ValidationCheckItem[] {
   const results: ValidationCheckItem[] = [];
   const mobMap = new Map(MOBS.map((m) => [m.id, m]));
   const itemMap = new Map(ITEMS.map((i) => [i.id, i]));
+  const clientMap = new Map(CLIENTS.map((c) => [c.id, c]));
 
   // 1. 에셋 존재 검사 (assetId, sceneAssetId, missionSceneAssetId, iconAssetIds)
   const missingAssets: string[] = [];
@@ -109,37 +111,158 @@ export function validateContentData(): ValidationCheckItem[] {
         : rewardErrors.join('; '),
   });
 
-  // 4. 미션 검사 (targetMobId 존재 여부, 밤 몹 대상 미션 count <= 3)
-  const missionErrors: string[] = [];
+  // 4. 의뢰자: itemId가 아이템 목록에 있고, sceneAssetId가 에셋에 있는가
+  const clientErrors: string[] = [];
+  for (const client of CLIENTS) {
+    if (!itemMap.has(client.itemId)) {
+      clientErrors.push(
+        `Client(${client.id}).itemId(${client.itemId})가 아이템 목록에 없음`,
+      );
+    }
+    if (!getAsset(client.sceneAssetId)) {
+      clientErrors.push(
+        `Client(${client.id}).sceneAssetId(${client.sceneAssetId})가 에셋에 없음`,
+      );
+    }
+  }
+  results.push({
+    id: 'client-links',
+    label: '의뢰자: itemId가 아이템 목록에 있고, sceneAssetId가 에셋에 있는가',
+    pass: clientErrors.length === 0,
+    detail:
+      clientErrors.length === 0
+        ? `의뢰자 ${CLIENTS.length}명 모두 itemId·sceneAssetId 존재`
+        : clientErrors.join('; '),
+  });
+
+  // 5. 미션: clientId가 의뢰자 목록에 있는가, count가 1 이상인가
+  const missionBaseErrors: string[] = [];
   for (const mission of MISSIONS) {
-    if (mission.kind === 'battle' || mission.targetMobId !== undefined) {
-      const targetMob = mission.targetMobId
-        ? mobMap.get(mission.targetMobId)
-        : undefined;
-      if (!targetMob) {
-        missionErrors.push(
-          `Mission(${mission.id})의 targetMobId(${mission.targetMobId ?? '없음'})가 몹 목록에 없음`,
-        );
-      } else if (
-        targetMob.time === 'night' &&
-        mission.count !== undefined &&
-        mission.count > 3
-      ) {
-        missionErrors.push(
+    if (!clientMap.has(mission.clientId)) {
+      missionBaseErrors.push(
+        `Mission(${mission.id}).clientId(${mission.clientId})가 의뢰자 목록에 없음`,
+      );
+    }
+    if (mission.count < 1) {
+      missionBaseErrors.push(
+        `Mission(${mission.id}).count(${mission.count})가 1 미만임`,
+      );
+    }
+  }
+  results.push({
+    id: 'mission-client-count',
+    label: '미션: clientId가 의뢰자 목록에 있는가, count가 1 이상인가',
+    pass: missionBaseErrors.length === 0,
+    detail:
+      missionBaseErrors.length === 0
+        ? `미션 ${MISSIONS.length}개 모두 유효한 clientId 및 count >= 1 확인`
+        : missionBaseErrors.join('; '),
+  });
+
+  // 6. 배틀 미션: targetMobId가 몹 목록에 있고, 그 몹의 exclusiveItemId가 의뢰자의 itemId와 같은가
+  const battleTargetErrors: string[] = [];
+  const battleMissions = MISSIONS.filter((m) => m.kind === 'battle');
+  for (const mission of battleMissions) {
+    const client = clientMap.get(mission.clientId);
+    const targetMob = mission.targetMobId
+      ? mobMap.get(mission.targetMobId)
+      : undefined;
+    if (!targetMob) {
+      battleTargetErrors.push(
+        `Mission(${mission.id}).targetMobId(${mission.targetMobId ?? '없음'})가 몹 목록에 없음`,
+      );
+    } else if (client && targetMob.exclusiveItemId !== client.itemId) {
+      battleTargetErrors.push(
+        `Mission(${mission.id}): Mob(${targetMob.id}).exclusiveItemId(${targetMob.exclusiveItemId}) !== Client(${client.id}).itemId(${client.itemId})`,
+      );
+    }
+  }
+  results.push({
+    id: 'battle-mission-target',
+    label:
+      '배틀 미션: targetMobId가 몹 목록에 있고, 그 몹의 exclusiveItemId가 의뢰자의 itemId와 같은가',
+    pass: battleTargetErrors.length === 0,
+    detail:
+      battleTargetErrors.length === 0
+        ? `배틀 미션 ${battleMissions.length}개 모두 원천 몹 및 의뢰 물건 일치`
+        : battleTargetErrors.join('; '),
+  });
+
+  // 7. 배틀 미션: 대상 몹의 time이 'night'이면 count가 3 이하인가
+  const battleNightErrors: string[] = [];
+  let nightBattleCount = 0;
+  for (const mission of battleMissions) {
+    const targetMob = mission.targetMobId
+      ? mobMap.get(mission.targetMobId)
+      : undefined;
+    if (targetMob && targetMob.time === 'night') {
+      nightBattleCount++;
+      if (mission.count > 3) {
+        battleNightErrors.push(
           `Mission(${mission.id}): 밤 몹(${targetMob.id}) 대상 미션 count(${mission.count})가 3을 초과함`,
         );
       }
     }
   }
   results.push({
-    id: 'mission-rules',
-    label:
-      '미션: targetMobId가 몹 목록에 있는가, 밤 몹 대상 미션의 count가 3 이하인가',
-    pass: missionErrors.length === 0,
+    id: 'battle-mission-night-count',
+    label: "배틀 미션: 대상 몹의 time이 'night'이면 count가 3 이하인가",
+    pass: battleNightErrors.length === 0,
     detail:
-      missionErrors.length === 0
-        ? `등록된 미션 ${MISSIONS.length}개 검사 통과`
-        : missionErrors.join('; '),
+      battleNightErrors.length === 0
+        ? `밤 몹 대상 배틀 미션 ${nightBattleCount}개 모두 count <= 3 충족`
+        : battleNightErrors.join('; '),
+  });
+
+  // 8. 탐색 미션: targetItemId가 의뢰자의 itemId와 같고, 'mimic-lock'이 아닌가
+  const exploreErrors: string[] = [];
+  const exploreMissions = MISSIONS.filter((m) => m.kind === 'explore');
+  for (const mission of exploreMissions) {
+    const client = clientMap.get(mission.clientId);
+    if (!mission.targetItemId) {
+      exploreErrors.push(`Mission(${mission.id}).targetItemId가 없음`);
+    } else {
+      if (client && mission.targetItemId !== client.itemId) {
+        exploreErrors.push(
+          `Mission(${mission.id}).targetItemId(${mission.targetItemId}) !== Client(${client.id}).itemId(${client.itemId})`,
+        );
+      }
+      if (mission.targetItemId === 'mimic-lock') {
+        exploreErrors.push(
+          `Mission(${mission.id}).targetItemId가 금지된 'mimic-lock'임`,
+        );
+      }
+    }
+  }
+  results.push({
+    id: 'explore-mission-target',
+    label:
+      "탐색 미션: targetItemId가 의뢰자의 itemId와 같고, 'mimic-lock'이 아닌가",
+    pass: exploreErrors.length === 0,
+    detail:
+      exploreErrors.length === 0
+        ? `탐색 미션 ${exploreMissions.length}개 모두 의뢰자의 itemId와 일치하며 'mimic-lock' 제외 확인`
+        : exploreErrors.join('; '),
+  });
+
+  // 9. 미션 id가 겹치지 않는가
+  const seenMissionIds = new Set<string>();
+  const duplicateMissionIds: string[] = [];
+  for (const mission of MISSIONS) {
+    if (seenMissionIds.has(mission.id)) {
+      duplicateMissionIds.push(mission.id);
+    } else {
+      seenMissionIds.add(mission.id);
+    }
+  }
+  results.push({
+    id: 'mission-unique-ids',
+    label: '미션 id가 겹치지 않는가',
+    pass: duplicateMissionIds.length === 0,
+    detail:
+      duplicateMissionIds.length === 0
+        ? `미션 ${MISSIONS.length}개 모두 고유 id 확인`
+        : `중복 id: ${duplicateMissionIds.join(', ')}`,
   });
 
   return results;

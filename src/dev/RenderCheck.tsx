@@ -7,10 +7,12 @@ import {
   type CodeLanguage,
   type Region,
 } from '../config';
+import { CLIENTS } from '../data/clients';
 import { getCodeQaStats, renderCode } from '../data/codeRender';
 import { EVENTS } from '../data/events';
 import { getItemEffect } from '../data/itemEffect';
 import { ITEMS } from '../data/items';
+import { MISSIONS } from '../data/missions';
 import { MOBS } from '../data/mobs';
 import type { ItemEffect } from '../data/types';
 import { validateContentData } from '../data/validate';
@@ -284,7 +286,12 @@ export function RenderCheck() {
     }));
   }, []);
 
+  const mobMap = useMemo(() => new Map(MOBS.map((m) => [m.id, m])), []);
   const itemMap = useMemo(() => new Map(ITEMS.map((i) => [i.id, i])), []);
+  const clientMap = useMemo(
+    () => new Map(CLIENTS.map((c) => [c.id, c])),
+    [],
+  );
   const validationResults = useMemo(() => validateContentData(), []);
 
   return (
@@ -968,6 +975,7 @@ export function RenderCheck() {
             width: '100%',
             maxWidth: '960px',
             fontSize: '14px',
+            marginBottom: '24px',
           }}
         >
           <thead>
@@ -1030,6 +1038,117 @@ export function RenderCheck() {
                 </td>
               </tr>
             ))}
+          </tbody>
+        </table>
+
+        <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>
+          5) 미션 목록 ({MISSIONS.length}종 — 의뢰자 {CLIENTS.length}명)
+        </h3>
+        <table
+          style={{
+            borderCollapse: 'collapse',
+            width: '100%',
+            maxWidth: '960px',
+            fontSize: '14px',
+          }}
+        >
+          <thead>
+            <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                의뢰 장면 그림
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                의뢰자
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                종류
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                난이도
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                대상 (몹 또는 아이템)
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                개수
+              </th>
+              <th style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                의뢰 대사
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {MISSIONS.map((mission) => {
+              const client = clientMap.get(mission.clientId);
+              const targetMob = mission.targetMobId
+                ? mobMap.get(mission.targetMobId)
+                : undefined;
+              const targetItem = mission.targetItemId
+                ? itemMap.get(mission.targetItemId)
+                : undefined;
+              return (
+                <tr key={mission.id}>
+                  <td
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      padding: '8px',
+                      background: '#1e293b',
+                    }}
+                  >
+                    {client && (
+                      <PixelSprite id={client.sceneAssetId} scale={1} />
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      padding: '8px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <strong>{client?.name ?? '-'}</strong> (
+                    <code>{mission.clientId}</code>)
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    <code>{mission.kind}</code>
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    <code>{mission.difficulty}</code>
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      padding: '8px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {mission.kind === 'battle' ? (
+                      <span>
+                        몹: <strong>{targetMob?.name ?? '-'}</strong> (
+                        <code>{mission.targetMobId}</code>)
+                      </span>
+                    ) : (
+                      <span>
+                        아이템: <strong>{targetItem?.name ?? '-'}</strong> (
+                        <code>{mission.targetItemId}</code>)
+                      </span>
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      padding: '8px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <strong>{mission.count}</strong>
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    {mission.dialogue}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
