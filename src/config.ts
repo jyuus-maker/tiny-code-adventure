@@ -50,6 +50,16 @@ export const CODE_QA_MAX_LOGICAL_OPS = 3;
 export const ALTAR_BLESSING_AMOUNT = 2;
 export const ALTAR_CURSE_RATIO = 0.5;
 
+// 스탯 굴림 규칙
+export const STAT_TOTAL_POINTS = 30;
+export const STAT_MIN_POINTS = 5;
+
+// TEMP: 스탯 배분 감마 분포 alpha 값
+export const STAT_ROLL_ALPHA = 2;
+
+// TEMP: 배틀 시뮬레이션에서 확정 (스탯 1포인트당 HP 환산 비율)
+export const HP_PER_POINT = 10;
+
 
 
 
