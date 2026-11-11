@@ -1,0 +1,224 @@
+/* 3D 카드 길 전용 스타일. .game-frame 안에서만 쓰이며 .road- 접두어로 한정한다. */
+
+.game-frame .road-screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.game-frame .road-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+
+.game-frame .road-distant {
+  position: absolute;
+  left: 50%;
+  pointer-events: none;
+}
+
+/* 길 바닥: 프레임 아래 가장자리를 축으로 눕힌다 */
+.game-frame .road-floor {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
+}
+
+.game-frame .road-strip {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  pointer-events: none;
+}
+
+.game-frame .road-tile {
+  flex: none;
+  overflow: hidden;
+}
+
+/* 카드: 바닥 위에 세워 둔다. transform은 인라인(깊이·단계별) */
+.game-frame .road-card {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform-origin: 50% 100%;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fdf6e3;
+  border: 6px solid #3b2f2f;
+  border-radius: 10px;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  transition-property: transform, opacity;
+  transition-timing-function: ease-in-out;
+  opacity: 1;
+}
+
+.game-frame .road-card-art {
+  width: 256px;
+  height: 256px;
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(59, 47, 47, 0.08);
+  border-radius: 6px;
+}
+
+.game-frame .road-card-name {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #3b2f2f;
+  white-space: nowrap;
+}
+
+.game-frame .road-card-open {
+  box-shadow: 0 18px 24px rgba(0, 0, 0, 0.35);
+}
+
+.game-frame .road-card-exit-pass,
+.game-frame .road-card-exit-discard {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 길가 지형지물 */
+.game-frame .road-prop {
+  position: absolute;
+  bottom: 0;
+  margin-left: -48px;
+  transform-origin: 50% 100%;
+  transition: transform var(--road-advance) ease-in-out;
+  pointer-events: none;
+}
+
+.game-frame .road-prop svg {
+  display: block;
+}
+
+/* HUD (최소. 상세 HUD는 후속) */
+.game-frame .road-hud {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  text-shadow:
+    0 1px 0 #0f172a,
+    0 0 8px rgba(15, 23, 42, 0.8);
+}
+
+.game-frame .road-hud-region {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.game-frame .road-hud-progress {
+  font-size: 16px;
+  padding-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 모달: 떠오른 카드와 같은 자리에 페이드인 (카드는 그대로 남고 모달이 위에 뜬다) */
+.game-frame .road-modal {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 2px solid #f8fafc;
+  border-radius: 10px;
+  color: #f1f5f9;
+  animation: road-modal-in var(--road-modal) ease-out both;
+  overflow: hidden;
+}
+
+@keyframes road-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.game-frame .road-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.game-frame .road-modal-env {
+  font-size: 12px;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.game-frame .road-modal-slots {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 2px 8px;
+  font-size: 13px;
+}
+
+.game-frame .road-modal-slots dt {
+  color: #cbd5e1;
+}
+
+.game-frame .road-modal-slots dd {
+  margin: 0;
+  color: #fbbf24;
+}
+
+.game-frame .road-dev-input {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  border-top: 1px dashed #64748b;
+  padding-top: 8px;
+}
+
+.game-frame .road-dev-title {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: #fdba74;
+}
+
+.game-frame .road-dev-input button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.game-frame .road-dev-input button small {
+  font-size: 10px;
+  color: #cbd5e1;
+  white-space: normal;
+}

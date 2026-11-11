@@ -14,10 +14,13 @@ export type AdventureReadyScreenProps = {
   regionOrder: readonly Region[];
   participationCount: number;
   timeOfDay: TimeOfDay;
+  /** 카드 길(모험 진행 구조)로 진입. 작업 02에서 연결 */
+  onEnterAdventure: () => void;
 };
 
 /**
- * 개발 확인용 준비 화면. 실제 게임 진행 화면(카드 길·전투·HUD·SDK)은 후속 작업에서 이 자리에 연결한다.
+ * 개발 확인용 준비 화면. 출발 시점이 향후 SDK 세션 시작 경계이며,
+ * 아래 버튼으로 카드 길 구조(작업 02)에 들어간다.
  * 지역 순서 표시는 개발 확인용이며 실제 플레이에 공개하는 기획이 아니다.
  */
 export function AdventureReadyScreen({
@@ -26,6 +29,7 @@ export function AdventureReadyScreen({
   regionOrder,
   participationCount,
   timeOfDay,
+  onEnterAdventure,
 }: AdventureReadyScreenProps) {
   const { heroStats } = roll;
   const { mission, client, item } = context;
@@ -34,8 +38,8 @@ export function AdventureReadyScreen({
   return (
     <div className="game-screen">
       <div className="game-ready-banner">
-        [개발 확인용] 게임 진행 화면 연결 예정 — 출발 시점이 향후 SDK 세션 시작
-        경계다. 아래는 현재 판의 시작 상태다.
+        [개발 확인용] 출발 시점이 향후 SDK 세션 시작 경계다. 아래는 현재 판의 시작
+        상태다. 카드 길로 진입하면 모험 진행 구조(작업 02)를 확인할 수 있다.
       </div>
 
       <div className="game-row">
@@ -91,6 +95,16 @@ export function AdventureReadyScreen({
         <p className="game-screen-note" style={{ marginTop: 8 }}>
           지역 순서는 개발 확인용 표시다.
         </p>
+      </div>
+
+      <div className="game-screen-footer">
+        <button
+          type="button"
+          className="game-button-primary"
+          onClick={onEnterAdventure}
+        >
+          카드 길로 진입
+        </button>
       </div>
     </div>
   );

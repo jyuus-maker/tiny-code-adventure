@@ -1,9 +1,19 @@
 import { useState } from 'react';
 import type { Rng } from '../logic/rng';
+import {
+  drawAdventureStart,
+  getEnvForParticipation,
+  planAdvance,
+  type CardOutcomeKind,
+} from './adventure';
 import { useFrameScale } from './frame';
 import {
+  applyAdventureArrived,
+  applyAdventureExited,
+  applyAdventureOutcome,
   applyConfirmStats,
   applyDepart,
+  applyEnterAdventure,
   applyReroll,
   applyStartStatRoll,
   createInitialState,
@@ -11,10 +21,13 @@ import {
   drawRegionOrder,
   drawStatRoll,
   getMissionContext,
+  missionReturnCheck,
   type GameState,
 } from './gameState';
 import { AdventureReadyScreen } from './screens/AdventureReadyScreen';
+import { AdventureScreen } from './screens/AdventureScreen';
 import { MissionScreen } from './screens/MissionScreen';
+import { RunEndScreen } from './screens/RunEndScreen';
 import { StatRollScreen } from './screens/StatRollScreen';
 import { TitleScreen } from './screens/TitleScreen';
 import './game.css';
@@ -52,6 +65,42 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
     setState((prev) => applyDepart(prev, regionOrder));
   };
 
+  // ---- 작업 02: 카드 길 ----
+
+  const handleEnterAdventure = () => {
+    const cur = state;
+    if (cur.phase !== 'adventureReady' || !cur.regionOrder || cur.adventure) return;
+    const env = getEnvForParticipation(cur.participationCount, cur.regionOrder);
+    if (!env) return;
+    const start = drawAdventureStart(env, rng);
+    setState((prev) => applyEnterAdventure(prev, start));
+  };
+
+  const handleCardArrived = () => {
+    setState((prev) => applyAdventureArrived(prev));
+  };
+
+  const handleCardOutcome = (kind: CardOutcomeKind) => {
+    setState((prev) => applyAdventureOutcome(prev, { kind }));
+  };
+
+  // 퇴장 연출 타이머는 closing 단계 렌더에서 걸리므로, 이 핸들러의 state는 결과 입력이 반영된 상태다.
+  // 추첨(planAdvance)은 여기서 한 번 하고, 상태 갱신 함수에는 계획만 넘긴다.
+  const handleCardExited = () => {
+    const cur = state;
+    if (cur.phase !== 'adventure' || !cur.adventure || !cur.regionOrder) return;
+    if (cur.adventure.stage !== 'closing') return;
+    // 후속 연결 지점: 귀가 질문(mission-return-check). 이번 작업은 항상 continue
+    if (missionReturnCheck(cur) !== 'continue') return;
+    const plan = planAdvance(
+      cur.participationCount,
+      cur.regionOrder,
+      cur.adventure,
+      rng,
+    );
+    setState((prev) => applyAdventureExited(prev, plan));
+  };
+
   return (
     <div className="game-viewport">
       <div className="game-frame" style={{ transform: `scale(${scale})` }}>
@@ -60,6 +109,10 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
           onReroll: handleReroll,
           onConfirmStats: handleConfirmStats,
           onDepart: handleDepart,
+          onEnterAdventure: handleEnterAdventure,
+          onCardArrived: handleCardArrived,
+          onCardOutcome: handleCardOutcome,
+          onCardExited: handleCardExited,
         })}
       </div>
     </div>
@@ -71,6 +124,10 @@ type ScreenHandlers = {
   onReroll: () => void;
   onConfirmStats: () => void;
   onDepart: () => void;
+  onEnterAdventure: () => void;
+  onCardArrived: () => void;
+  onCardOutcome: (kind: CardOutcomeKind) => void;
+  onCardExited: () => void;
 };
 
 function renderScreen(state: GameState, handlers: ScreenHandlers) {
@@ -110,9 +167,41 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
           regionOrder={state.regionOrder}
           participationCount={state.participationCount}
           timeOfDay={state.timeOfDay}
+          onEnterAdventure={handlers.onEnterAdventure}
         />
       );
     }
+
+    case 'adventure': {
+      if (!state.adventure || !state.regionOrder) {
+        return <StateError phase={state.phase} />;
+      }
+      const fallbackEnv =
+        getEnvForParticipation(
+          Math.min(state.participationCount, 29),
+          state.regionOrder,
+        ) ?? null;
+      if (!fallbackEnv) return <StateError phase={state.phase} />;
+      return (
+        <AdventureScreen
+          adventure={state.adventure}
+          participationCount={state.participationCount}
+          fallbackEnv={fallbackEnv}
+          onArrived={handlers.onCardArrived}
+          onOutcome={handlers.onCardOutcome}
+          onExited={handlers.onCardExited}
+        />
+      );
+    }
+
+    case 'runEnd':
+      if (!state.adventure) return <StateError phase={state.phase} />;
+      return (
+        <RunEndScreen
+          participationCount={state.participationCount}
+          adventure={state.adventure}
+        />
+      );
   }
 }
 
