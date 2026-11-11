@@ -14,7 +14,11 @@ import {
   applyConfirmStats,
   applyDepart,
   applyEnterAdventure,
+  applyMissionItemCollected,
+  applyMobDamageRecorded,
   applyReroll,
+  applyReturnDecision,
+  applyRewardChoice,
   applyStartStatRoll,
   createInitialState,
   drawMissionId,
@@ -22,8 +26,11 @@ import {
   drawStatRoll,
   getMissionContext,
   missionReturnCheck,
+  setReturnPromptPending,
   type GameState,
 } from './gameState';
+import type { RewardOption } from '../logic/rewards/types';
+import type { ItemGrade } from '../render/types';
 import { AdventureReadyScreen } from './screens/AdventureReadyScreen';
 import { AdventureScreen } from './screens/AdventureScreen';
 import { MissionScreen } from './screens/MissionScreen';
@@ -84,14 +91,44 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
     setState((prev) => applyAdventureOutcome(prev, { kind }));
   };
 
+  const handleVictoryReward = (
+    reward?: RewardOption,
+    quality?: ItemGrade | null,
+    damage?: number,
+  ) => {
+    setState((prev) => {
+      let next = prev;
+      if (typeof damage === 'number' && damage > 0) {
+        next = applyMobDamageRecorded(next, damage);
+      }
+      if (quality) {
+        next = applyMissionItemCollected(next, quality);
+      }
+      if (reward) {
+        next = applyRewardChoice(next, reward);
+      }
+      return next;
+    });
+  };
+
+  const handleReturnDecision = (decision: 'return' | 'continue') => {
+    setState((prev) => applyReturnDecision(prev, decision));
+  };
+
   // 퇴장 연출 타이머는 closing 단계 렌더에서 걸리므로, 이 핸들러의 state는 결과 입력이 반영된 상태다.
   // 추첨(planAdvance)은 여기서 한 번 하고, 상태 갱신 함수에는 계획만 넘긴다.
   const handleCardExited = () => {
     const cur = state;
     if (cur.phase !== 'adventure' || !cur.adventure || !cur.regionOrder) return;
     if (cur.adventure.stage !== 'closing') return;
-    // 후속 연결 지점: 귀가 질문(mission-return-check). 이번 작업은 항상 continue
-    if (missionReturnCheck(cur) !== 'continue') return;
+
+    // 후속 연결 지점: 귀가 질문(mission-return-check) (§4-9)
+    // 달성 상태이고 30번째 카드가 아니면 귀가 질문 모달 대기
+    if (missionReturnCheck(cur) === 'prompt-return' && !cur.returnPromptPending) {
+      setState((prev) => setReturnPromptPending(prev, true));
+      return;
+    }
+
     const plan = planAdvance(
       cur.participationCount,
       cur.regionOrder,
@@ -113,6 +150,8 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
           onCardArrived: handleCardArrived,
           onCardOutcome: handleCardOutcome,
           onCardExited: handleCardExited,
+          onVictoryReward: handleVictoryReward,
+          onReturnDecision: handleReturnDecision,
         })}
       </div>
     </div>
@@ -128,6 +167,12 @@ type ScreenHandlers = {
   onCardArrived: () => void;
   onCardOutcome: (kind: CardOutcomeKind) => void;
   onCardExited: () => void;
+  onVictoryReward: (
+    reward?: RewardOption,
+    quality?: ItemGrade | null,
+    damage?: number,
+  ) => void;
+  onReturnDecision: (decision: 'return' | 'continue') => void;
 };
 
 function renderScreen(state: GameState, handlers: ScreenHandlers) {
@@ -173,9 +218,12 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
     }
 
     case 'adventure': {
-      if (!state.adventure || !state.regionOrder) {
+      if (!state.adventure || !state.regionOrder || !state.roll) {
         return <StateError phase={state.phase} />;
       }
+      const context = state.missionId
+        ? getMissionContext(state.missionId)
+        : null;
       const fallbackEnv =
         getEnvForParticipation(
           Math.min(state.participationCount, 29),
@@ -186,10 +234,17 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
         <AdventureScreen
           adventure={state.adventure}
           participationCount={state.participationCount}
+          heroStats={state.roll.heroStats}
+          heroEffects={state.heroEffects}
+          missionContext={context}
+          missionInventory={state.missionInventory}
+          returnPromptPending={state.returnPromptPending}
           fallbackEnv={fallbackEnv}
           onArrived={handlers.onCardArrived}
           onOutcome={handlers.onCardOutcome}
           onExited={handlers.onCardExited}
+          onVictoryReward={handlers.onVictoryReward}
+          onReturnDecision={handlers.onReturnDecision}
         />
       );
     }

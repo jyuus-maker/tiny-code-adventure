@@ -16,6 +16,18 @@ import {
   type CardOutcomeKind,
   type CardStage,
 } from '../adventure';
+import { BattleModal } from '../battle/BattleModal';
+import '../battle/battle.css';
+import type { HeroStats } from '../../logic/statRoll';
+import type { HeroEffectState } from '../../logic/effects/types';
+import {
+  getEffectiveAttack,
+  getEffectiveDefense,
+  getEffectiveMaxHp,
+} from '../../logic/effects/slotManager';
+import type { HeroMissionInventory, MissionContext } from '../gameState';
+import type { RewardOption } from '../../logic/rewards/types';
+import type { ItemGrade } from '../../render/types';
 import { GAME_FRAME_HEIGHT, GAME_FRAME_WIDTH } from '../frame';
 import {
   cardSlotDepth,
@@ -34,11 +46,22 @@ import '../road.css';
 export type AdventureScreenProps = {
   adventure: AdventureState;
   participationCount: number;
+  heroStats: HeroStats;
+  heroEffects?: HeroEffectState | null;
+  missionContext?: MissionContext | null;
+  missionInventory?: HeroMissionInventory;
+  returnPromptPending?: boolean;
   /** 활성 카드가 없을 때(종료 직전) 장면 환경으로 쓸 값 */
   fallbackEnv: CardEnv;
   onArrived: () => void;
   onOutcome: (kind: CardOutcomeKind) => void;
   onExited: () => void;
+  onVictoryReward?: (
+    reward?: RewardOption,
+    quality?: ItemGrade | null,
+    damage?: number,
+  ) => void;
+  onReturnDecision?: (decision: 'return' | 'continue') => void;
 };
 
 type ModalRect = { left: number; top: number; width: number; height: number };
@@ -64,10 +87,17 @@ const DEV_OUTCOMES: readonly { kind: CardOutcomeKind; label: string; note: strin
 export function AdventureScreen({
   adventure,
   participationCount,
+  heroStats,
+  heroEffects = null,
+  missionContext = null,
+  missionInventory = { shining: 0, normal: 0, broken: 0, totalCollected: 0 },
+  returnPromptPending = false,
   fallbackEnv,
   onArrived,
   onOutcome,
   onExited,
+  onVictoryReward,
+  onReturnDecision,
 }: AdventureScreenProps) {
   const { active, preview, stage, advanceCount } = adventure;
   const env = active?.env ?? fallbackEnv;
@@ -76,6 +106,21 @@ export function AdventureScreen({
   const colors = getRoadColors(env.region, distantBgId);
   const pathPalette = getAssetRegionPalette(ROAD_TILE_ASSET_ID, env.region);
   const horizonY = computeHorizonY();
+
+  // 미션 아이콘 호버 툴팁 상태
+  const [missionHovered, setMissionHovered] = useState(false);
+
+  // 실시간 유효 스탯 계산 (§4-7)
+  const currentHp = heroEffects ? heroEffects.currentHp : heroStats.hp;
+  const maxHp = heroEffects ? getEffectiveMaxHp(heroEffects) : heroStats.maxHp;
+  const effectiveAtk = heroEffects ? getEffectiveAttack(heroEffects) : heroStats.attack;
+  const effectiveDef = heroEffects ? getEffectiveDefense(heroEffects) : heroStats.defense;
+
+  const baseAtk = heroEffects ? heroEffects.baseAttack + heroEffects.permanentAttackBonus : heroStats.attack;
+  const baseDef = heroEffects ? heroEffects.baseDefense + heroEffects.permanentDefenseBonus : heroStats.defense;
+
+  const atkDiff = effectiveAtk - baseAtk;
+  const defDiff = effectiveDef - baseDef;
 
   const activeCardRef = useRef<HTMLDivElement | null>(null);
   // 모달 위치는 "어느 카드의 open 단계에서 쟀는가"와 함께 보관해, 카드·단계가 바뀌면 자동으로 무효가 된다
@@ -201,11 +246,169 @@ export function AdventureScreen({
         </div>
       </div>
 
-      <div className="road-hud" aria-label="진행 정보">
-        <div className="road-hud-region">{REGION_DISPLAY[env.region]}</div>
-        <div className="road-hud-progress">
-          {env.day}일차 {TIME_LABEL[env.timeOfDay]} · 참여 {participationCount} /{' '}
-          {TOTAL_PARTICIPATION_CARDS}
+      {/* 작업 04 HUD 시스템 (§4-7, §6-4) */}
+      <div className="road-hud" aria-label="진행 정보" style={{ flexDirection: 'column', gap: 4, width: 'calc(100% - 24px)', maxWidth: 420 }}>
+        {/* 1행: 지역 / 일차 / 참여수 / 타이머(미구현) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: 11 }}>
+          <div className="road-hud-region" style={{ fontSize: 13, fontWeight: 700 }}>
+            {REGION_DISPLAY[env.region]}
+          </div>
+          <div className="road-hud-progress" style={{ fontSize: 11 }}>
+            {env.day}일차 {TIME_LABEL[env.timeOfDay]} · 참여 {participationCount} / {TOTAL_PARTICIPATION_CARDS}
+          </div>
+          <div style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: 4 }}>
+            타이머 (미구현)
+          </div>
+        </div>
+
+        {/* 2행: 용사 스탯 & HP 게이지 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', fontSize: 11 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+            <span style={{ fontWeight: 600 }}>HP</span>
+            <div style={{ flex: 1, height: 8, background: '#0f172a', borderRadius: 4, overflow: 'hidden', border: '1px solid #334155' }}>
+              <div
+                style={{
+                  height: '100%',
+                  background: currentHp <= 0 ? '#ef4444' : '#10b981',
+                  width: `${Math.max(0, Math.min(100, (currentHp / maxHp) * 100))}%`,
+                  transition: 'width 0.2s',
+                }}
+              />
+            </div>
+            <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 11 }}>
+              {currentHp}/{maxHp}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, fontVariantNumeric: 'tabular-nums' }}>
+            <span>
+              공격 <strong>{effectiveAtk}</strong>
+              {atkDiff !== 0 && (
+                <span style={{ color: atkDiff > 0 ? '#86efac' : '#f87171', fontSize: 10 }}>
+                  ({atkDiff > 0 ? `+${atkDiff}` : atkDiff})
+                </span>
+              )}
+            </span>
+            <span>
+              방어 <strong>{effectiveDef}</strong>
+              {defDiff !== 0 && (
+                <span style={{ color: defDiff > 0 ? '#86efac' : '#f87171', fontSize: 10 }}>
+                  ({defDiff > 0 ? `+${defDiff}` : defDiff})
+                </span>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* 3행: 공방 슬롯 (1칸), 피 슬롯 (1칸), 미션 슬롯 (1칸) */}
+        <div style={{ display: 'flex', gap: 6, width: '100%', fontSize: 10, marginTop: 2 }}>
+          {/* 공방 슬롯 */}
+          <div
+            style={{
+              flex: 1,
+              background: 'rgba(15, 23, 42, 0.75)',
+              border: heroEffects?.combatSlot ? '1px solid #3b82f6' : '1px dashed #475569',
+              borderRadius: 4,
+              padding: '3px 6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ color: '#93c5fd', fontWeight: 600 }}>공방:</span>
+            {heroEffects?.combatSlot ? (
+              <span title={`${heroEffects.combatSlot.name} (${heroEffects.combatSlot.remainingTurns}턴 남음)`}>
+                {heroEffects.combatSlot.name} (+{heroEffects.combatSlot.value}){' '}
+                <span style={{ color: '#facc15' }}>{heroEffects.combatSlot.remainingTurns}T</span>
+              </span>
+            ) : (
+              <span style={{ color: '#64748b' }}>비어 있음</span>
+            )}
+          </div>
+
+          {/* 피 슬롯 */}
+          <div
+            style={{
+              flex: 1,
+              background: 'rgba(15, 23, 42, 0.75)',
+              border: heroEffects?.vitalSlot ? '1px solid #10b981' : '1px dashed #475569',
+              borderRadius: 4,
+              padding: '3px 6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ color: '#86efac', fontWeight: 600 }}>피:</span>
+            {heroEffects?.vitalSlot ? (
+              <span title={`${heroEffects.vitalSlot.name} (${heroEffects.vitalSlot.remainingTurns}턴 남음)`}>
+                {heroEffects.vitalSlot.name}{' '}
+                <span style={{ color: '#facc15' }}>{heroEffects.vitalSlot.remainingTurns}T</span>
+              </span>
+            ) : (
+              <span style={{ color: '#64748b' }}>비어 있음</span>
+            )}
+          </div>
+
+          {/* 미션 슬롯 (호버 툴팁 지원) */}
+          {missionContext && (
+            <div
+              style={{
+                position: 'relative',
+                background: 'rgba(15, 23, 42, 0.75)',
+                border: '1px solid #eab308',
+                borderRadius: 4,
+                padding: '2px 6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                cursor: 'pointer',
+              }}
+              onMouseEnter={() => setMissionHovered(true)}
+              onMouseLeave={() => setMissionHovered(false)}
+              onClick={() => setMissionHovered((prev) => !prev)}
+            >
+              <PixelSprite id={missionContext.item.assetId} scale={0.5} />
+              <span style={{ fontWeight: 600, color: '#fde047' }}>
+                {missionInventory.totalCollected}/{missionContext.mission.count}
+              </span>
+
+              {/* 호버 툴팁 */}
+              {missionHovered && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '100%',
+                    right: 0,
+                    marginBottom: 6,
+                    background: '#0f172a',
+                    border: '1px solid #eab308',
+                    borderRadius: 6,
+                    padding: '6px 8px',
+                    fontSize: 10,
+                    color: '#f8fafc',
+                    whiteSpace: 'nowrap',
+                    zIndex: 100,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#fde047', marginBottom: 2 }}>
+                    {missionContext.item.name}
+                  </div>
+                  <div>빛나는: {missionInventory.shining}개</div>
+                  <div>일반: {missionInventory.normal}개</div>
+                  <div>부서진: {missionInventory.broken}개</div>
+                  <div style={{ color: '#94a3b8', fontSize: 9, marginTop: 2 }}>
+                    (요구 수량: {missionContext.mission.count}개)
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -221,36 +424,113 @@ export function AdventureScreen({
             height: modalRect.height,
           }}
         >
-          <div className="road-modal-head">
-            <strong>{active.def.name}</strong>
-            <span className="road-modal-env">
-              {REGION_DISPLAY[env.region]} · {env.day}일차 {TIME_LABEL[env.timeOfDay]}
-            </span>
-          </div>
-          <dl className="road-modal-slots">
-            <dt>지문</dt>
-            <dd>미구현 (후속 이벤트·전투 작업)</dd>
-            <dt>코드</dt>
-            <dd>미구현 (CHK 06)</dd>
-            <dt>선택지</dt>
-            <dd>미구현</dd>
-            <dt>결과</dt>
-            <dd>미구현</dd>
-          </dl>
-          <div className="road-dev-input">
-            <div className="road-dev-title">[개발 확인용 결과 입력] 실제 선택지가 아니다</div>
-            {DEV_OUTCOMES.map((o) => (
+          {active.def.kind === 'mob' ? (
+            <BattleModal
+              card={active.def}
+              region={env.region}
+              timeOfDay={env.timeOfDay}
+              dayIndex={env.day}
+              heroStats={heroStats}
+              heroEffects={heroEffects}
+              missionContext={missionContext}
+              onVictory={(totalDamage, reward, quality) => {
+                onVictoryReward?.(reward, quality, totalDamage);
+                onOutcome('participate');
+              }}
+              onFleeSuccess={() => onOutcome('pass')}
+              onDefeat={() => onOutcome('participate')}
+            />
+          ) : (
+            <>
+              <div className="road-modal-head">
+                <strong>{active.def.name}</strong>
+                <span className="road-modal-env">
+                  {REGION_DISPLAY[env.region]} · {env.day}일차 {TIME_LABEL[env.timeOfDay]}
+                </span>
+              </div>
+              <dl className="road-modal-slots">
+                <dt>지문</dt>
+                <dd>미구현 (후속 이벤트·전투 작업)</dd>
+              </dl>
+              <div className="road-modal-actions" aria-label="개발 확인용 결과 입력">
+                {DEV_OUTCOMES.map(({ kind, label, note }) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="road-modal-btn"
+                    disabled={!inputEnabled}
+                    onClick={() => onOutcome(kind)}
+                    title={note}
+                  >
+                    <span>{label}</span>
+                    <small>{note}</small>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 귀가 질문 모달 (§4-9) */}
+      {returnPromptPending && (
+        <div
+          className="return-prompt-overlay"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 120,
+          }}
+        >
+          <div
+            style={{
+              background: '#1e293b',
+              border: '2px solid #eab308',
+              borderRadius: 8,
+              padding: '16px 20px',
+              maxWidth: 320,
+              textAlign: 'center',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fde047', marginBottom: 8 }}>
+              미션 요구량 달성!
+            </div>
+            <p style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.5, marginBottom: 16 }}>
+              의뢰에 필요한 물품을 모두 모았습니다 ({missionInventory.totalCollected}/
+              {missionContext?.mission.count}개).
+              <br />
+              지금 마을로 귀가하시겠습니까?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button
-                key={o.kind}
                 type="button"
-                disabled={!inputEnabled}
-                onClick={() => onOutcome(o.kind)}
-                title={o.note}
+                className="game-button-primary"
+                style={{ padding: '8px 14px', fontSize: 12 }}
+                onClick={() => onReturnDecision?.('return')}
               >
-                {o.label}
-                <small>{o.note}</small>
+                마을로 귀가 (완료)
               </button>
-            ))}
+              <button
+                type="button"
+                style={{
+                  padding: '8px 14px',
+                  fontSize: 12,
+                  background: '#334155',
+                  color: '#f8fafc',
+                  border: '1px solid #64748b',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                }}
+                onClick={() => onReturnDecision?.('continue')}
+              >
+                계속 모험하기
+              </button>
+            </div>
           </div>
         </div>
       )}
