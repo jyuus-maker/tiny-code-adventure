@@ -1,0 +1,266 @@
+/* 게임 런타임 전용 스타일. 모든 선택자를 .game-viewport 아래로 한정해
+   기존 검증 페이지(RenderCheck)에 영향을 주지 않는다. */
+
+.game-viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #0f172a;
+  color: #f1f5f9;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+/* 800×500 논리 프레임. 배율은 GameApp에서 transform으로 적용 */
+.game-frame {
+  position: relative;
+  width: 800px;
+  height: 500px;
+  flex: none;
+  overflow: hidden;
+  background: #1e293b;
+  transform-origin: center center;
+  box-sizing: border-box;
+}
+
+.game-frame *,
+.game-frame *::before,
+.game-frame *::after {
+  box-sizing: border-box;
+}
+
+.game-frame h1,
+.game-frame h2,
+.game-frame h3,
+.game-frame p {
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+.game-frame h1 {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.game-frame h2 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.game-frame h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.game-frame button {
+  font: inherit;
+  cursor: pointer;
+  padding: 10px 24px;
+  border: 2px solid #f8fafc;
+  border-radius: 6px;
+  background: #334155;
+  color: #f8fafc;
+  font-size: 18px;
+}
+
+.game-frame button:hover {
+  background: #475569;
+}
+
+.game-frame button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.game-frame button.game-button-primary {
+  background: #b45309;
+  border-color: #fde68a;
+}
+
+.game-frame button.game-button-primary:hover {
+  background: #d97706;
+}
+
+/* 화면 공통 */
+.game-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 32px;
+  gap: 16px;
+}
+
+.game-screen-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.game-screen-note {
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.game-screen-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.game-panel {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.game-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.game-row > * {
+  min-width: 0;
+}
+
+.game-stat-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.game-stat-table th,
+.game-stat-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #475569;
+  text-align: left;
+}
+
+.game-stat-table th {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.game-stat-table td.game-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-sprite-box {
+  display: inline-block;
+  flex: none;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* 타이틀 */
+.game-title-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.game-title-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding-bottom: 40px;
+}
+
+.game-title-content h1 {
+  text-shadow:
+    0 2px 0 #0f172a,
+    0 0 12px rgba(15, 23, 42, 0.9);
+}
+
+.game-title-buttons {
+  display: flex;
+  gap: 16px;
+}
+
+/* 도움말 오버레이 */
+.game-help {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.game-help-panel {
+  width: 640px;
+  max-height: 440px;
+  overflow: auto;
+  background: #1e293b;
+  border: 2px solid #f8fafc;
+  border-radius: 8px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.game-help-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.game-help-list li span {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* 준비 화면 */
+.game-ready-banner {
+  background: #7c2d12;
+  border: 1px dashed #fdba74;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.game-region-list {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-region-list li {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-region-list li.game-region-current {
+  border-color: #fde68a;
+}

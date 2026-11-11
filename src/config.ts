@@ -57,8 +57,8 @@ export const STAT_MIN_POINTS = 5;
 // TEMP: 스탯 배분 감마 분포 alpha 값
 export const STAT_ROLL_ALPHA = 2;
 
-// TEMP: 배틀 시뮬레이션에서 확정 (스탯 1포인트당 HP 환산 비율)
-export const HP_PER_POINT = 10;
+// TEMP: v1.2 사용자 승인 초기값 ×100 (스탯 1포인트당 HP 환산 비율). 피해량 스케일 조율은 CHK 08
+export const HP_PER_POINT = 100;
 
 
 
