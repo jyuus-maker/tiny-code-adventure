@@ -4,19 +4,27 @@ import { TOTAL_PARTICIPATION_CARDS } from '../adventure';
 export type RunEndScreenProps = {
   participationCount: number;
   adventure: AdventureState;
+  heroDead?: boolean;
 };
 
 /**
- * 30장 참여 완료 뒤의 개발 확인용 종료 경계.
+ * 30장 참여 완료 또는 전투 패배(사망) 뒤의 개발 확인용 종료 경계.
  * 엔딩·귀가·점수 제출(run-end 후속 연결 지점)은 구현하지 않았고 엔딩 화면으로 표시하지 않는다.
  */
-export function RunEndScreen({ participationCount, adventure }: RunEndScreenProps) {
+export function RunEndScreen({
+  participationCount,
+  adventure,
+  heroDead = false,
+}: RunEndScreenProps) {
   return (
     <div className="game-screen">
-      <div className="game-ready-banner">
-        [개발 확인용 종료 경계] 참여 {participationCount} /{' '}
-        {TOTAL_PARTICIPATION_CARDS} 완료. 신규 카드를 추첨하지 않는다. 엔딩·귀가·점수
-        제출은 후속 작업(run-end 연결 지점).
+      <div
+        className="game-ready-banner"
+        style={heroDead ? { background: 'rgba(239, 68, 68, 0.2)', borderColor: '#ef4444', color: '#fca5a5' } : undefined}
+      >
+        {heroDead
+          ? `[게임 오버] 용사가 전투에서 쓰러졌습니다. 참여 ${participationCount} / ${TOTAL_PARTICIPATION_CARDS} 진행 후 모험 종료.`
+          : `[개발 확인용 종료 경계] 참여 ${participationCount} / ${TOTAL_PARTICIPATION_CARDS} 완료. 신규 카드를 추첨하지 않는다. 엔딩·귀가·점수 제출은 후속 작업(run-end 연결 지점).`}
       </div>
       <div className="game-panel" style={{ overflow: 'auto', maxHeight: 380 }}>
         <h3>카드 기록 ({adventure.log.length}장 처리)</h3>

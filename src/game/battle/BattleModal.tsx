@@ -55,9 +55,14 @@ export type BattleModalProps = {
     totalDamage: number,
     reward?: RewardOption,
     missionQuality?: ItemGrade | null,
+    finalHeroHp?: number,
+    finalHeroEffects?: HeroEffectState | null,
   ) => void;
   onFleeSuccess: () => void;
-  onDefeat: () => void;
+  onDefeat: (
+    finalHeroHp?: number,
+    finalHeroEffects?: HeroEffectState | null,
+  ) => void;
   onTick?: (nextEffects: HeroEffectState) => void;
 };
 
@@ -188,19 +193,15 @@ export function BattleModal({
     // 행동 종료 틱 1회 실행 (§4-7)
     let updatedHeroHp = next.hero.hp;
     if (res.tickExecuted && currentEffects) {
-      const tickedEffects = tickEffects(currentEffects);
+      const effectsBeforeTick: HeroEffectState = {
+        ...currentEffects,
+        currentHp: updatedHeroHp,
+        isDead: updatedHeroHp <= 0,
+      };
+      const tickedEffects = tickEffects(effectsBeforeTick);
       setCurrentEffects(tickedEffects);
       onTick?.(tickedEffects);
-
-      // 도트 효과로 인한 HP 변경 반영
-      if (currentEffects.vitalSlot?.kind === 'dot-heal') {
-        const healAmt = currentEffects.vitalSlot.value;
-        const maxHp = getEffectiveMaxHp(tickedEffects);
-        updatedHeroHp = Math.min(maxHp, updatedHeroHp + healAmt);
-      } else if (currentEffects.vitalSlot?.kind === 'dot-damage') {
-        const dmgAmt = currentEffects.vitalSlot.value;
-        updatedHeroHp = Math.max(0, updatedHeroHp - dmgAmt);
-      }
+      updatedHeroHp = tickedEffects.currentHp;
     }
 
     const stateWithTickedHp: BattleState = {
@@ -382,14 +383,17 @@ let monsterCharged = ${battleState.mob.charged};
 let heroHit = heroHp / (heroHp + monsterHp);       // hero hit: ${heroHitPct}%
 let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%`;
 
+  const mobDef = MOBS.find((m) => m.id === actualMobId);
+  const mobAssetId = mobDef?.assetId ?? battleState.mob.assetId ?? actualMobId;
+
   return (
     <div className="battle-modal-content">
       {/* 몹 스프라이트 및 정보 */}
       <div className="battle-header">
         <div className="battle-sprite-box">
           <PixelSprite
-            id={isSleepingCard && phase === 'encounter-choice' ? 'event-sleeping-mob-128' : battleState.mob.id}
-            palette={getAssetRegionPalette(battleState.mob.id, region)}
+            id={isSleepingCard && phase === 'encounter-choice' ? 'event-sleeping-mob-128' : mobAssetId}
+            palette={isSleepingCard && phase === 'encounter-choice' ? undefined : getAssetRegionPalette(mobAssetId, region)}
             scale={2}
           />
         </div>
@@ -572,6 +576,8 @@ let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%
                         battleState.totalMobDamageTaken,
                         rewardChoices.optionA,
                         collectedMissionQuality,
+                        battleState.hero.hp,
+                        currentEffects,
                       )
                     }
                   >
@@ -599,6 +605,8 @@ let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%
                         battleState.totalMobDamageTaken,
                         rewardChoices.optionB,
                         collectedMissionQuality,
+                        battleState.hero.hp,
+                        currentEffects,
                       )
                     }
                   >
@@ -614,7 +622,15 @@ let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%
               <button
                 type="button"
                 className="game-button-primary"
-                onClick={() => onVictory(battleState.totalMobDamageTaken)}
+                onClick={() =>
+                  onVictory(
+                    battleState.totalMobDamageTaken,
+                    undefined,
+                    collectedMissionQuality,
+                    battleState.hero.hp,
+                    currentEffects,
+                  )
+                }
               >
                 다음으로 (참여 +1)
               </button>
@@ -625,7 +641,10 @@ let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%
         {phase === 'defeat' && (
           <div className="battle-result-box">
             <span style={{ color: '#f87171', fontWeight: 600 }}>패배... 용사가 쓰러졌다.</span>
-            <button type="button" onClick={onDefeat}>
+            <button
+              type="button"
+              onClick={() => onDefeat(battleState.hero.hp, currentEffects)}
+            >
               결과 확인
             </button>
           </div>

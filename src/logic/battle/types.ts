@@ -50,6 +50,7 @@ export const DEFAULT_BATTLE_CONFIG: BattleConfig = {
 export type BattleParticipantState = {
   kind: ParticipantKind;
   id: string;
+  assetId?: string;
   name: string;
   hp: number;
   maxHp: number;

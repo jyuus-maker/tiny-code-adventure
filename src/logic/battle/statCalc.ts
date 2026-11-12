@@ -76,6 +76,7 @@ export function createMobParticipant(
   return {
     kind: 'mob',
     id: mob.id,
+    assetId: mob.assetId,
     name: displayName,
     hp: finalHp,
     maxHp: finalHp,

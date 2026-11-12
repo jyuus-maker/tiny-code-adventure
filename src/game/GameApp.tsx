@@ -30,6 +30,7 @@ import {
   type GameState,
 } from './gameState';
 import type { RewardOption } from '../logic/rewards/types';
+import type { HeroEffectState } from '../logic/effects/types';
 import type { ItemGrade } from '../render/types';
 import { AdventureReadyScreen } from './screens/AdventureReadyScreen';
 import { AdventureScreen } from './screens/AdventureScreen';
@@ -95,15 +96,29 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
     reward?: RewardOption,
     quality?: ItemGrade | null,
     damage?: number,
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
   ) => {
     setState((prev) => {
       let next = prev;
       if (typeof damage === 'number' && damage > 0) {
         next = applyMobDamageRecorded(next, damage);
       }
+      // 1. 전투 종료 시점의 최종 효과/HP 반영 (§4-7, I-01)
+      if (finalEffects) {
+        next = {
+          ...next,
+          heroEffects: {
+            ...finalEffects,
+            currentHp: finalHp !== undefined ? finalHp : finalEffects.currentHp,
+          },
+        };
+      }
+      // 2. 미션템 수집 반영 (§4-6)
       if (quality) {
         next = applyMissionItemCollected(next, quality);
       }
+      // 3. 선택한 보상 적용 (최종 상태 위에 즉시 얹음) (§4-6, §4-7)
       if (reward) {
         next = applyRewardChoice(next, reward);
       }
@@ -111,8 +126,89 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
     });
   };
 
+  const handleDefeat = (
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
+  ) => {
+    setState((prev) => {
+      let next = prev;
+      const deadEffects: HeroEffectState = finalEffects
+        ? {
+            ...finalEffects,
+            currentHp: finalHp !== undefined ? Math.max(0, finalHp) : 0,
+            isDead: true,
+          }
+        : prev.heroEffects
+          ? {
+              ...prev.heroEffects,
+              currentHp: 0,
+              isDead: true,
+            }
+          : {
+              baseAttack: prev.roll?.heroStats.attack ?? 10,
+              baseDefense: prev.roll?.heroStats.defense ?? 10,
+              baseMaxHp: prev.roll?.heroStats.maxHp ?? 1000,
+              permanentAttackBonus: 0,
+              permanentDefenseBonus: 0,
+              permanentHpBonus: 0,
+              currentHp: 0,
+              combatSlot: null,
+              vitalSlot: null,
+              isDead: true,
+            };
+
+      next = {
+        ...next,
+        heroEffects: deadEffects,
+      };
+
+      // 참여 카운트 +1 및 카드 로그 반영 (§4-4)
+      if (next.adventure) {
+        next = applyAdventureOutcome(next, { kind: 'participate' });
+      }
+
+      // 전투 패배(사망) 시 정상적인 게임오버 처리 (§4-4, I-01)
+      return {
+        ...next,
+        phase: 'runEnd',
+      };
+    });
+  };
+
+  const handleEffectsTick = (effects: HeroEffectState) => {
+    setState((prev) => ({
+      ...prev,
+      heroEffects: effects,
+    }));
+  };
+
   const handleReturnDecision = (decision: 'return' | 'continue') => {
-    setState((prev) => applyReturnDecision(prev, decision));
+    if (decision === 'return') {
+      setState((prev) => applyReturnDecision(prev, 'return'));
+      return;
+    }
+
+    // decision === 'continue': 귀가 질문 닫고 다음 카드로 전진 (§4-9, I-02)
+    setState((prev) => {
+      const dismissed = applyReturnDecision(prev, 'continue');
+      if (
+        dismissed.phase !== 'adventure' ||
+        !dismissed.adventure ||
+        !dismissed.regionOrder
+      ) {
+        return dismissed;
+      }
+      if (dismissed.adventure.stage === 'closing') {
+        const plan = planAdvance(
+          dismissed.participationCount,
+          dismissed.regionOrder,
+          dismissed.adventure,
+          rng,
+        );
+        return applyAdventureExited(dismissed, plan);
+      }
+      return dismissed;
+    });
   };
 
   // 퇴장 연출 타이머는 closing 단계 렌더에서 걸리므로, 이 핸들러의 state는 결과 입력이 반영된 상태다.
@@ -151,6 +247,8 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
           onCardOutcome: handleCardOutcome,
           onCardExited: handleCardExited,
           onVictoryReward: handleVictoryReward,
+          onDefeat: handleDefeat,
+          onEffectsTick: handleEffectsTick,
           onReturnDecision: handleReturnDecision,
         })}
       </div>
@@ -171,7 +269,14 @@ type ScreenHandlers = {
     reward?: RewardOption,
     quality?: ItemGrade | null,
     damage?: number,
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
   ) => void;
+  onDefeat: (
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
+  ) => void;
+  onEffectsTick: (effects: HeroEffectState) => void;
   onReturnDecision: (decision: 'return' | 'continue') => void;
 };
 
@@ -244,6 +349,8 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
           onOutcome={handlers.onCardOutcome}
           onExited={handlers.onCardExited}
           onVictoryReward={handlers.onVictoryReward}
+          onDefeat={handlers.onDefeat}
+          onEffectsTick={handlers.onEffectsTick}
           onReturnDecision={handlers.onReturnDecision}
         />
       );
@@ -255,6 +362,7 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
         <RunEndScreen
           participationCount={state.participationCount}
           adventure={state.adventure}
+          heroDead={state.heroEffects?.isDead ?? false}
         />
       );
   }

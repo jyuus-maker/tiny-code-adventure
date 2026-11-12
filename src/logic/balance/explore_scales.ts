@@ -1,6 +1,6 @@
-import { runBattleSimulation } from 'd:/260630ai/preliminary-project/tiny-code-adventure/src/logic/balance/simulator';
-import { DEFAULT_BATTLE_CONFIG, type BattleConfig } from 'd:/260630ai/preliminary-project/tiny-code-adventure/src/logic/battle';
-import { createSeededRng } from 'd:/260630ai/preliminary-project/tiny-code-adventure/src/logic/rng';
+import { runBattleSimulation } from './simulator';
+import { DEFAULT_BATTLE_CONFIG, type BattleConfig } from '../battle';
+import { createSeededRng } from '../rng';
 
 const scales = [10, 25, 40, 60];
 const defRates = [1.0, 0.7, 0.5];

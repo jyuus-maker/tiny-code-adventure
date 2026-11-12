@@ -60,7 +60,14 @@ export type AdventureScreenProps = {
     reward?: RewardOption,
     quality?: ItemGrade | null,
     damage?: number,
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
   ) => void;
+  onDefeat?: (
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
+  ) => void;
+  onEffectsTick?: (effects: HeroEffectState) => void;
   onReturnDecision?: (decision: 'return' | 'continue') => void;
 };
 
@@ -97,6 +104,8 @@ export function AdventureScreen({
   onOutcome,
   onExited,
   onVictoryReward,
+  onDefeat,
+  onEffectsTick,
   onReturnDecision,
 }: AdventureScreenProps) {
   const { active, preview, stage, advanceCount } = adventure;
@@ -433,12 +442,15 @@ export function AdventureScreen({
               heroStats={heroStats}
               heroEffects={heroEffects}
               missionContext={missionContext}
-              onVictory={(totalDamage, reward, quality) => {
-                onVictoryReward?.(reward, quality, totalDamage);
+              onVictory={(totalDamage, reward, quality, finalHp, finalEffects) => {
+                onVictoryReward?.(reward, quality, totalDamage, finalHp, finalEffects);
                 onOutcome('participate');
               }}
               onFleeSuccess={() => onOutcome('pass')}
-              onDefeat={() => onOutcome('participate')}
+              onDefeat={(finalHp, finalEffects) => {
+                onDefeat?.(finalHp, finalEffects);
+              }}
+              onTick={onEffectsTick}
             />
           ) : (
             <>
