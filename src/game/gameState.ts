@@ -94,6 +94,8 @@ export type GameState = {
   scoreItemPoints: number;
   /** 미션 달성 후 귀가 질문 대기 상태 (§4-9) */
   returnPromptPending: boolean;
+  /** 마지막으로 귀가 질문을 표시했을 때의 미션템 총 수집량 (§4-9, I-04) */
+  lastPromptedMissionCount: number;
 };
 
 export function createInitialState(): GameState {
@@ -110,6 +112,7 @@ export function createInitialState(): GameState {
     totalMobDamage: 0,
     scoreItemPoints: 0,
     returnPromptPending: false,
+    lastPromptedMissionCount: 0,
   };
 }
 
@@ -339,6 +342,10 @@ export function setReturnPromptPending(
   return {
     ...state,
     returnPromptPending: pending,
+    // 귀가 질문 팝업이 활성화될 때 현재 수량을 마지막 질문 수량으로 기록 (§4-9, I-04)
+    lastPromptedMissionCount: pending
+      ? state.missionInventory.totalCollected
+      : state.lastPromptedMissionCount,
   };
 }
 
@@ -363,14 +370,18 @@ export function applyReturnDecision(
 /**
  * 후속 연결 지점(mission-return-check): 카드 결과·보상 처리 뒤, 카드가 버려지기 직전에
  * 미션 달성 여부에 따라 귀가를 묻는 자리(§4-9).
- * 30번째 카드가 아니고, 미션 달성 상태이면 질문 대기로 분기 가능.
+ * - 30번째 카드가 아니고, 미션 요구량을 '최초 달성한 순간' 또는 '달성 이후 추가 획득할 때마다' 질문 (I-04)
  */
 export function missionReturnCheck(state: GameState): 'continue' | 'prompt-return' {
   // 30번째 참여 카드에서는 질문 없이 바로 완주 (§4-9)
   if (state.participationCount >= TOTAL_PARTICIPATION_CARDS) {
     return 'continue';
   }
-  if (isMissionGoalReached(state)) {
+  // 미션 목표 수량을 달성했고, 마지막 질문 이후 미션템을 추가 획득한 경우에만 질문 (§4-9, I-04)
+  if (
+    isMissionGoalReached(state) &&
+    state.missionInventory.totalCollected > state.lastPromptedMissionCount
+  ) {
     return 'prompt-return';
   }
   return 'continue';

@@ -1,180 +1,308 @@
-.battle-modal-content {
+/* ==========================================================================
+   Tiny Code Adventure — Battle Styles (UI v9.1)
+   중앙 정렬 372px 모달, HUD 시각적 간섭 차단 레이아웃
+   ========================================================================== */
+
+.battle-floats-container {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.battle-floats-container > * {
+  pointer-events: auto;
+}
+
+/* 1. 배틀 헤더 (몹 프레임 & 몹 HP & 상태바) */
+.battle-head {
+  position: absolute;
+  left: 214px;
+  top: 92px;
+  width: 372px;
+  height: 138px;
+  padding: 10px 12px 0;
+  background: linear-gradient(125deg, #f5ebd4, #decbb1);
+  border: 1px solid #ad9072;
+  box-shadow: 0 15px 26px #10121863, 0 0 25px 16px #11161e27, 0 0 56px 32px #14192224;
+  color: #413638;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  height: 100%;
 }
 
-.battle-header {
+.battle-main {
   display: flex;
-  gap: 12px;
   align-items: center;
+  gap: 12px;
+  height: 96px;
+  flex: none;
 }
 
-.battle-sprite-box {
-  width: 64px;
-  height: 64px;
-  flex: none;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid #475569;
-  border-radius: 6px;
+.battle-head .battle-art {
+  width: 88px;
+  height: 88px;
+  background: #bbd1a3;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: none;
   overflow: hidden;
+  border: 1px solid #94aa7d;
+  box-shadow: inset 0 0 0 2px #d8e6c7;
 }
 
-.battle-status-box {
+.battle-head .battle-data {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
-.battle-status-row {
+.battle-head .battle-data small {
+  color: #8d715c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.battle-head .battle-data h2 {
+  margin: 4px 0 8px;
+  font-size: 19px;
+  font-weight: 900;
+  color: #3b2d2f;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 6px;
 }
 
-.battle-badge-charge {
+.battle-head .badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-weight: 800;
+}
+
+.battle-head .badge.charge {
   background: #b45309;
   color: #fef08a;
   border: 1px solid #fde047;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 600;
 }
 
-.battle-badge-defend {
+.battle-head .badge.defend {
   background: #1e3a8a;
   color: #bfdbfe;
   border: 1px solid #60a5fa;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 11px;
 }
 
-.battle-badge-counter {
+.battle-head .badge.counter {
   background: #4c1d95;
   color: #e9d5ff;
   border: 1px solid #c084fc;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 600;
 }
 
-.battle-hp-text {
-  margin-left: auto;
-  font-size: 12px;
-  color: #cbd5e1;
-  font-variant-numeric: tabular-nums;
-}
-
-.battle-hp-bar-bg {
-  width: 100%;
-  height: 8px;
-  background: #0f172a;
-  border-radius: 4px;
+.enemy-hp {
+  height: 11px;
+  background: #5c4854;
+  border: 1px solid #a7858a;
+  position: relative;
   overflow: hidden;
-  border: 1px solid #334155;
 }
 
-.battle-hp-bar-fill {
+.enemy-hp .fill {
   height: 100%;
-  transition: width 0.3s ease;
+  background: linear-gradient(#e17d7d, #b94d64);
+  transition: width 0.25s ease;
 }
 
-.battle-hp-bar-fill.mob {
-  background: #ef4444;
+.enemy-hp-num {
+  font: 10px Consolas, monospace;
+  margin-top: 4px;
+  color: #6e5455;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  justify-content: space-between;
 }
 
-.battle-hp-bar-fill.hero {
-  background: #10b981;
-}
-
-.battle-message-box {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid #334155;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 13px;
-  min-height: 38px;
+.battle-status {
+  height: 29px;
+  flex: none;
+  border-top: 1px solid #c2ab90;
+  background: transparent;
+  color: #634b42;
+  font-size: 11px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 1px;
+  gap: 5px;
+  white-space: nowrap;
 }
 
-.battle-message-box p {
-  margin: 0;
-  line-height: 1.4;
+.battle-status b {
+  font-weight: 900;
 }
 
-.battle-code-box {
-  background: #090d16;
-  border: 1px solid #1e293b;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.4;
-  color: #38bdf8;
-  overflow-x: auto;
+/* 2. 중앙 배틀 코드/로그 패널 (상단박스 바닥 230px과 15px, 버튼박스 417px과 15px 세로 정간격) */
+.battle-code {
+  position: absolute;
+  left: 214px;
+  top: 225px;
+  width: 372px;
+  height: 173px;
+  box-shadow: 0 15px 26px #10121863, 0 0 25px 16px #11161e27, 0 0 56px 32px #14192224;
 }
 
-.battle-code-box pre {
-  margin: 0;
-}
-
+/* 3. 하단 배틀 액션 버튼 바 */
 .battle-actions {
-  margin-top: auto;
+  position: absolute;
+  left: 214px;
+  top: 417px;
+  width: 372px;
+  z-index: 50;
+  display: flex;
+  gap: 8px;
+}
+
+.battle-actions button {
+  flex: 1;
+  min-width: 0;
+  padding: 0 4px;
+  height: 40px;
+}
+
+/* 4. 전투 승리 보상 UI (.reward-floats) */
+.reward-floats {
+  position: absolute;
+  inset: 0;
+  z-index: 48;
+}
+
+.reward-title {
+  position: absolute;
+  left: 214px;
+  top: 123px;
+  width: 372px;
+  padding: 16px 20px;
+  text-align: center;
+  background: linear-gradient(#f8edd9, #ead7b9);
+  color: #45393b;
+  border: 1px solid #bf9f72;
+  box-shadow: 0 15px 26px #10121863, 0 0 25px 16px #11161e27, 0 0 56px 32px #14192224;
+}
+
+.reward-title .trophy {
+  font-size: 26px;
+  color: #b4894f;
+}
+
+.reward-title h2 {
+  font-size: 22px;
+  font-weight: 900;
+  margin: 4px 0;
+  color: #3f2f32;
+}
+
+.reward-title p {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #7b6355;
+  margin: 6px 0 0;
+}
+
+.reward-choices {
+  position: absolute;
+  top: 245px;
+  left: 214px;
+  width: 372px;
+  display: flex;
+  gap: 8px;
+  z-index: 50;
+}
+
+.reward-choices button {
+  flex: 1;
+  min-width: 0;
+  height: 160px;
+  text-align: left;
+  padding: 12px 14px 10px;
+  background: linear-gradient(#32313e, #222530);
+  border: 2px solid #b69a6f;
+  color: #f0d8af;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 10px 18px #0e111a9c;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  transition: border-color 0.15s, transform 0.1s;
 }
 
-.battle-choice-buttons,
-.battle-in-fight-buttons,
-.battle-result-box {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.reward-choices button:hover {
+  border-color: #ffe0a1;
+  transform: translateY(-3px);
 }
 
-.battle-choice-buttons button,
-.battle-in-fight-buttons button {
-  flex: 1;
-  font-size: 14px;
-  padding: 8px 12px;
+.reward-choices .tag {
+  display: block;
+  font-size: 9px;
+  color: #d0b27b;
+  margin-bottom: 6px;
+  font-weight: 800;
 }
 
-.battle-turn-indicator {
+.reward-choices b {
+  display: block;
+  font-size: 15px;
+  color: #fff0ce;
+}
+
+.reward-choices small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #c9bdba;
+  margin-top: 6px;
+}
+
+.reward-choices .reward-icon-box {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  margin-top: auto;
+  align-self: center;
+  background: linear-gradient(140deg, #766073, #373549);
+  border: 2px solid #c3a578;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 2px #494054;
+  overflow: hidden;
+}
+
+/* 5. 패배 및 도망 결과 다이얼로그 */
+.battle-result-card {
+  position: absolute;
+  left: 214px;
+  top: 150px;
+  width: 372px;
+  background: linear-gradient(#fbefdb, #e9d5b7);
+  box-shadow: 0 19px 33px #10151bc9;
+  padding: 22px 20px;
+  border: 2px solid #c1a177;
+  text-align: center;
+  color: #453739;
+  z-index: 50;
+}
+
+.battle-result-card h2 {
+  font-size: 16px;
+  font-weight: 900;
+  color: #b91c1c;
+  margin: 6px 0 20px;
+  white-space: nowrap;
+}
+
+.battle-result-card p {
   font-size: 12px;
-  color: #facc15;
-  font-style: italic;
-  margin-left: 8px;
+  line-height: 1.7;
+  color: #716255;
+  margin-bottom: 16px;
 }
-
-.battle-result-box button {
-  margin-left: auto;
-  font-size: 14px;
-  padding: 8px 16px;
-}
-
-.battle-reward-btn {
-  background: #1e293b !important;
-  border: 1px solid #3b82f6 !important;
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-
-.battle-reward-btn:hover {
-  background: #2563eb !important;
-  border-color: #60a5fa !important;
-  transform: translateY(-1px);
-}
-
-

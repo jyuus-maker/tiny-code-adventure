@@ -46,6 +46,9 @@ export function resolveHitGrade(
   return 'crit';
 }
 
+// TEMP: 사람 손으로 배틀 종료 테스트를 위해 계산된 데미지에 * 100 적용 (사용자 요청 #5)
+export const BATTLE_DAMAGE_MULTIPLIER = 100;
+
 /**
  * 기본 피해량 계산식 (§4-4).
  * (공격력 - 방어력 * 방어감소율) × 등급 배율 × 차지 배율. 명중 시 최소 피해 1.
@@ -67,16 +70,20 @@ export function calculateDamage(
   const baseDiff = Math.max(0.1, attackerAtk - effectiveDef);
 
   if (config.damageMode === 'scaled') {
-    return Math.max(
-      config.minDamage,
-      Math.round(baseDiff * config.damageScale * gradeMult * chargeMult),
+    return (
+      Math.max(
+        config.minDamage,
+        Math.round(baseDiff * config.damageScale * gradeMult * chargeMult),
+      ) * BATTLE_DAMAGE_MULTIPLIER
     );
   }
 
   // points 기본 모드 (메인스펙 순수 기본식)
-  return Math.max(
-    config.minDamage,
-    Math.round(baseDiff * gradeMult * chargeMult),
+  return (
+    Math.max(
+      config.minDamage,
+      Math.round(baseDiff * gradeMult * chargeMult),
+    ) * BATTLE_DAMAGE_MULTIPLIER
   );
 }
 
@@ -98,15 +105,19 @@ export function calculateCounterReflection(
   const baseDiff = Math.max(0.1, attackerAtk - attackerDef * config.defenseRate);
 
   if (config.damageMode === 'scaled') {
-    return Math.max(
-      config.minDamage,
-      Math.round(baseDiff * config.damageScale * gradeMult * chargeMult * config.counterMultiplier),
+    return (
+      Math.max(
+        config.minDamage,
+        Math.round(baseDiff * config.damageScale * gradeMult * chargeMult * config.counterMultiplier),
+      ) * BATTLE_DAMAGE_MULTIPLIER
     );
   }
 
-  return Math.max(
-    config.minDamage,
-    Math.round(baseDiff * gradeMult * chargeMult * config.counterMultiplier),
+  return (
+    Math.max(
+      config.minDamage,
+      Math.round(baseDiff * gradeMult * chargeMult * config.counterMultiplier),
+    ) * BATTLE_DAMAGE_MULTIPLIER
   );
 }
 
@@ -117,6 +128,7 @@ export function createInitialQualityLog(): QualityLog {
     lastHitGrade: null,
     lastHitByHero: false,
     lastActionType: null,
+    lastHitWasCharged: false,
   };
 }
 
@@ -274,10 +286,12 @@ export function stepBattle(
     qualityLog.lastHitGrade = hitGrade;
     qualityLog.lastHitByHero = isHeroTurn;
     qualityLog.lastActionType = 'attack';
+    qualityLog.lastHitWasCharged = isHeroTurn && wasCharged;
   } else if (isCountered && reflectedDamage > 0) {
     qualityLog.lastHitGrade = hitGrade;
     qualityLog.lastHitByHero = !isHeroTurn; // 반사는 카운터를 친 쪽의 유효타
     qualityLog.lastActionType = 'counter';
+    qualityLog.lastHitWasCharged = false;
   }
 
   // 6. 사망 및 틱 처리
@@ -313,6 +327,7 @@ export function stepBattle(
     turnNumber,
     actor: state.activeActor,
     action,
+    wasCharged,
     hitRate: computeHitRate(actorHpBefore, targetHpBefore, config),
     isHit,
     hitGrade,

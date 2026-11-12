@@ -1,13 +1,6 @@
 import { HP_PER_POINT } from '../../config';
 import type { StatRollResult } from '../gameState';
 
-/** 배분 경향 표시 (메인스펙 §4-2 유형 표) */
-const DOMINANT_LABEL: Record<'hp' | 'attack' | 'defense', string> = {
-  attack: '버서커형 (공격 높음)',
-  defense: '탱커형 (방어 높음)',
-  hp: '생존형 (HP 높음)',
-};
-
 export type StatRollScreenProps = {
   roll: StatRollResult;
   onReroll: () => void;
@@ -19,64 +12,57 @@ export function StatRollScreen({
   onReroll,
   onConfirm,
 }: StatRollScreenProps) {
-  const { points, heroStats, dominant } = roll;
+  const { points, heroStats } = roll;
   const total = points.hp + points.attack + points.defense;
 
   return (
-    <div className="game-screen">
-      <div className="game-screen-header">
-        <h2>용사의 스탯</h2>
-        <span className="game-screen-note">
-          총 {total}포인트 랜덤 배분 · 마음에 들 때까지 다시 굴릴 수 있다
-        </span>
-      </div>
+    <section className="screen prep-screen" data-scene="stat">
+      <div className="pix-bg" />
+      <div className="darkwash" />
 
-      <div className="game-panel">
-        <table className="game-stat-table">
-          <thead>
-            <tr>
-              <th>스탯</th>
-              <th style={{ textAlign: 'right' }}>포인트</th>
-              <th style={{ textAlign: 'right' }}>실제 값</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>HP</td>
-              <td className="game-num">{points.hp}</td>
-              <td className="game-num">
-                {heroStats.hp} / {heroStats.maxHp}
-                <span className="game-screen-note">
-                  {' '}
-                  (1포인트 = {HP_PER_POINT} HP)
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td>공격</td>
-              <td className="game-num">{points.attack}</td>
-              <td className="game-num">{heroStats.attack}</td>
-            </tr>
-            <tr>
-              <td>방어</td>
-              <td className="game-num">{points.defense}</td>
-              <td className="game-num">{heroStats.defense}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p className="game-screen-note" style={{ marginTop: 8 }}>
-          배분 경향: {dominant ? DOMINANT_LABEL[dominant] : '균형 (최고 스탯 동률)'}
-        </p>
-      </div>
+      <div className="gold-panel prep-wrap">
+        <div className="prep-heading">CREATE YOUR HERO</div>
+        <div className="prep-title">용사의 스탯을 정해주세요</div>
+        <p className="prep-sub">HP · 공격 · 방어, 합계 30포인트 · 각 항목 최소 5</p>
 
-      <div className="game-screen-footer">
-        <button type="button" onClick={onReroll}>
-          다시 굴리기
-        </button>
-        <button type="button" className="game-button-primary" onClick={onConfirm}>
-          이 스탯으로 확정
-        </button>
+        <div className="stat-cards">
+          {/* 1. HP 카드 */}
+          <div className="roll-card">
+            <div className="ic">♥</div>
+            <div className="statnum">{points.hp}</div>
+            <div className="statname">HP 포인트</div>
+            <div className="stat-sub">({heroStats.hp} HP · 1pt={HP_PER_POINT})</div>
+          </div>
+
+          {/* 2. 공격 카드 */}
+          <div className="roll-card">
+            <div className="ic">⚔</div>
+            <div className="statnum">{points.attack}</div>
+            <div className="statname">공격</div>
+            <div className="stat-sub">기본 공격력</div>
+          </div>
+
+          {/* 3. 방어 카드 */}
+          <div className="roll-card">
+            <div className="ic">⬡</div>
+            <div className="statnum">{points.defense}</div>
+            <div className="statname">방어</div>
+            <div className="stat-sub">피해 경감율</div>
+          </div>
+        </div>
+
+        <div className="roll-foot">
+          <div className="total">
+            총합 <strong>{total}</strong>
+          </div>
+          <button className="light-btn" type="button" onClick={onReroll}>
+            다시 굴리기 ↻
+          </button>
+          <button className="gold-btn" type="button" onClick={onConfirm}>
+            이 스탯으로 결정
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -1,61 +1,110 @@
 import type { AdventureState } from '../adventure';
 import { TOTAL_PARTICIPATION_CARDS } from '../adventure';
+import type { HeroMissionInventory, MissionContext } from '../gameState';
+import type { HeroStats } from '../../logic/statRoll';
+import type { HeroEffectState } from '../../logic/effects/types';
 
 export type RunEndScreenProps = {
   participationCount: number;
   adventure: AdventureState;
   heroDead?: boolean;
+  totalMobDamage?: number;
+  scoreItemPoints?: number;
+  missionContext?: MissionContext | null;
+  missionInventory?: HeroMissionInventory;
+  heroStats?: HeroStats | null;
+  heroEffects?: HeroEffectState | null;
+  onRestart?: () => void;
 };
 
-/**
- * 30장 참여 완료 또는 전투 패배(사망) 뒤의 개발 확인용 종료 경계.
- * 엔딩·귀가·점수 제출(run-end 후속 연결 지점)은 구현하지 않았고 엔딩 화면으로 표시하지 않는다.
- */
 export function RunEndScreen({
   participationCount,
-  adventure,
   heroDead = false,
+  totalMobDamage = 0,
+  scoreItemPoints = 0,
+  missionContext = null,
+  missionInventory = { shining: 0, normal: 0, broken: 0, totalCollected: 0 },
+  heroStats = null,
+  heroEffects = null,
+  onRestart,
 }: RunEndScreenProps) {
+  const currentHp = heroEffects ? Math.max(0, heroEffects.currentHp) : heroStats ? heroStats.hp : 0;
+  const isMissionCompleted = missionContext
+    ? missionInventory.totalCollected >= missionContext.mission.count
+    : false;
+
+  // 점수 계산: 피해량 점수 + 스코어템 점수 + 미션 완료 보너스
+  const missionBonus = isMissionCompleted
+    ? (missionInventory.shining * 300 + missionInventory.normal * 150 + missionInventory.broken * 50)
+    : 0;
+  const totalScore = totalMobDamage + scoreItemPoints + missionBonus;
+
+  const title = heroDead
+    ? '용사 쓰러짐'
+    : isMissionCompleted
+      ? '모험 완료'
+      : '모험 종료';
+
+  const subText = heroDead
+    ? '전투에서 힘이 다해 쓰러졌습니다.'
+    : isMissionCompleted
+      ? '의뢰를 무사히 완수하고 마을로 귀가했습니다.'
+      : '의뢰를 완수하지 못한 채 모험을 마쳤습니다.';
+
   return (
-    <div className="game-screen">
-      <div
-        className="game-ready-banner"
-        style={heroDead ? { background: 'rgba(239, 68, 68, 0.2)', borderColor: '#ef4444', color: '#fca5a5' } : undefined}
-      >
-        {heroDead
-          ? `[게임 오버] 용사가 전투에서 쓰러졌습니다. 참여 ${participationCount} / ${TOTAL_PARTICIPATION_CARDS} 진행 후 모험 종료.`
-          : `[개발 확인용 종료 경계] 참여 ${participationCount} / ${TOTAL_PARTICIPATION_CARDS} 완료. 신규 카드를 추첨하지 않는다. 엔딩·귀가·점수 제출은 후속 작업(run-end 연결 지점).`}
+    <section className="screen end-screen" data-scene="end">
+      <div className="pix-bg" />
+      <div className="end-wash" />
+
+      <div className="gold-panel end-sheet">
+        <div className="end-mini">ADVENTURE RESULT</div>
+        <h2>{title}</h2>
+        <p className="status-line">{subText}</p>
+
+        <div className="end-score-label">TOTAL SCORE</div>
+        <div className="end-score">{totalScore.toLocaleString()}</div>
+
+        <div className="end-stats">
+          <div>
+            <small>몬스터에게 준 피해</small>
+            <b>{totalMobDamage.toLocaleString()}</b>
+          </div>
+          <div>
+            <small>보너스 점수</small>
+            <b>{scoreItemPoints.toLocaleString()}</b>
+          </div>
+          <div>
+            <small>참여 카드</small>
+            <b>{participationCount} / {TOTAL_PARTICIPATION_CARDS}</b>
+          </div>
+          <div>
+            <small>빛나는 / 일반 / 부서진</small>
+            <b>
+              {missionInventory.shining} / {missionInventory.normal} / {missionInventory.broken}
+            </b>
+          </div>
+          <div>
+            <small>최종 HP</small>
+            <b>{currentHp}</b>
+          </div>
+          <div>
+            <small>미션 달성</small>
+            <b style={{ color: isMissionCompleted ? '#86efac' : '#f87171' }}>
+              {isMissionCompleted ? '완료' : '미달성'}
+            </b>
+          </div>
+        </div>
+
+        <div className="end-action">
+          <button
+            className="gold-btn"
+            type="button"
+            onClick={onRestart ?? (() => window.location.reload())}
+          >
+            타이틀로 돌아가기　◆
+          </button>
+        </div>
       </div>
-      <div className="game-panel" style={{ overflow: 'auto', maxHeight: 380 }}>
-        <h3>카드 기록 ({adventure.log.length}장 처리)</h3>
-        <table className="game-stat-table" style={{ marginTop: 8, fontSize: 13 }}>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>카드</th>
-              <th>환경</th>
-              <th>결과</th>
-              <th style={{ textAlign: 'right' }}>참여</th>
-            </tr>
-          </thead>
-          <tbody>
-            {adventure.log.map((e) => (
-              <tr key={e.instanceId}>
-                <td>{e.instanceId}</td>
-                <td>{e.baseId}</td>
-                <td>
-                  {e.env.day}일차 {e.env.timeOfDay === 'day' ? '낮' : '밤'} ·{' '}
-                  {e.env.region}
-                </td>
-                <td>{e.outcome}</td>
-                <td className="game-num">
-                  +{e.delta} → {e.participationAfter}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </section>
   );
 }

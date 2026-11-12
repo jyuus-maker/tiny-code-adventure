@@ -53,6 +53,10 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
   const [state, setState] = useState<GameState>(createInitialState);
   const scale = useFrameScale();
 
+  const handleRestart = () => {
+    setState(createInitialState());
+  };
+
   const handleStart = () => {
     const roll = drawStatRoll(rng);
     setState((prev) => applyStartStatRoll(prev, roll));
@@ -250,6 +254,7 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
           onDefeat: handleDefeat,
           onEffectsTick: handleEffectsTick,
           onReturnDecision: handleReturnDecision,
+          onRestart: handleRestart,
         })}
       </div>
     </div>
@@ -278,6 +283,7 @@ type ScreenHandlers = {
   ) => void;
   onEffectsTick: (effects: HeroEffectState) => void;
   onReturnDecision: (decision: 'return' | 'continue') => void;
+  onRestart: () => void;
 };
 
 function renderScreen(state: GameState, handlers: ScreenHandlers) {
@@ -356,15 +362,26 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
       );
     }
 
-    case 'runEnd':
+    case 'runEnd': {
       if (!state.adventure) return <StateError phase={state.phase} />;
+      const context = state.missionId
+        ? getMissionContext(state.missionId)
+        : null;
       return (
         <RunEndScreen
           participationCount={state.participationCount}
           adventure={state.adventure}
           heroDead={state.heroEffects?.isDead ?? false}
+          totalMobDamage={state.totalMobDamage}
+          scoreItemPoints={state.scoreItemPoints}
+          missionContext={context}
+          missionInventory={state.missionInventory}
+          heroStats={state.roll?.heroStats ?? null}
+          heroEffects={state.heroEffects}
+          onRestart={handlers.onRestart}
         />
       );
+    }
   }
 }
 

@@ -150,7 +150,7 @@ export function BattleModal({
     if (encounterType === 'ambush') return '기습을 당했다! 몬스터가 먼저 공격해 온다!';
     if (encounterType === 'sleeping') {
       return sleepDepth === 'light'
-        ? '몬스터가 선잠에 들어 있다. 조심스럽게 지나갈 수 있을 것 같다.'
+        ? '몬스터가 선잠에 빠져 있다. 조용히 지나갈까?'
         : '몬스터가 깊은 잠에 빠져 있다. 몰래 지나갈 기회다!';
     }
     return `${battleState.mob.name}과(와) 마주쳤다. 어떻게 할까?`;
@@ -253,7 +253,13 @@ export function BattleModal({
       analyticsCollector.record(record);
 
       if (stateWithTickedHp.winner === 'hero') {
-        // 1. 배틀 미션 대상 몹 처치 시 미션템 품질 판정 (§4-6)
+        const isMimic = actualMobId === 'mimic';
+        const lastHitGrade = stateWithTickedHp.qualityLog.lastHitGrade;
+        const lastActionType = stateWithTickedHp.qualityLog.lastActionType;
+        const wasLastHitCharged = stateWithTickedHp.qualityLog.lastHitWasCharged;
+
+        // 1. 배틀 미션 대상 몹 처치 시 미션템 품질 판정 (§4-6, §12-3)
+        // 대상 몹 처치 막타 타격 유형별 가중치 추첨 적용 (보상과 분리된 독립 추첨)
         const isMissionTarget =
           missionContext?.mission.kind === 'battle' &&
           (actualMobId === missionContext.mission.targetMobId ||
@@ -261,20 +267,19 @@ export function BattleModal({
 
         let q: ItemGrade | null = null;
         if (isMissionTarget) {
-          q = determineMissionItemQuality(stateWithTickedHp.qualityLog);
+          q = determineMissionItemQuality(
+            lastHitGrade,
+            lastActionType,
+            wasLastHitCharged,
+            isMimic,
+          );
           setCollectedMissionQuality(q);
         }
 
         // 2. 막타 타격 분류에 따른 보상 등급 추첨 및 2택 1 보상 생성 (§4-6)
-        const isMimic = actualMobId === 'mimic';
-        const lastHeroRes = stateWithTickedHp.history
-          .filter((h) => h.actor === 'hero')
-          .pop();
-        const wasLastHitCharged = lastHeroRes?.action === 'attack' && stateWithTickedHp.qualityLog.hasChargeCrit;
-
         const rewardGrade = rollRewardGrade(
-          stateWithTickedHp.qualityLog.lastHitGrade,
-          stateWithTickedHp.qualityLog.lastActionType,
+          lastHitGrade,
+          lastActionType,
           wasLastHitCharged,
           isMimic,
         );
@@ -387,241 +392,111 @@ let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%
   const mobAssetId = mobDef?.assetId ?? battleState.mob.assetId ?? actualMobId;
 
   return (
-    <div className="battle-modal-content">
-      {/* 몹 스프라이트 및 정보 */}
-      <div className="battle-header">
-        <div className="battle-sprite-box">
-          <PixelSprite
-            id={isSleepingCard && phase === 'encounter-choice' ? 'event-sleeping-mob-128' : mobAssetId}
-            palette={isSleepingCard && phase === 'encounter-choice' ? undefined : getAssetRegionPalette(mobAssetId, region)}
-            scale={2}
-          />
-        </div>
-        <div className="battle-status-box">
-          <div className="battle-status-row">
-            <strong>{battleState.mob.name}</strong>
-            {battleState.mob.charged && <span className="battle-badge-charge">차지 중!</span>}
-            {battleState.mob.defending && <span className="battle-badge-defend">방어 중</span>}
-            {battleState.mob.countering && <span className="battle-badge-counter">카운터 준비!</span>}
-            <span className="battle-hp-text">
-              HP {Math.max(0, battleState.mob.hp)} / {battleState.mob.maxHp}
-            </span>
-          </div>
-          <div className="battle-hp-bar-bg">
-            <div
-              className="battle-hp-bar-fill mob"
-              style={{ width: `${Math.max(0, (battleState.mob.hp / battleState.mob.maxHp) * 100)}%` }}
-            />
-          </div>
-
-          <div className="battle-status-row" style={{ marginTop: 8 }}>
-            <strong>용사 (나)</strong>
-            {battleState.hero.charged && <span className="battle-badge-charge">차지 중!</span>}
-            {battleState.hero.defending && <span className="battle-badge-defend">방어 중</span>}
-            {battleState.hero.countering && <span className="battle-badge-counter">카운터 준비!</span>}
-            <span className="battle-hp-text">
-              HP {Math.max(0, battleState.hero.hp)} / {battleState.hero.maxHp}
-            </span>
-          </div>
-          <div className="battle-hp-bar-bg">
-            <div
-              className="battle-hp-bar-fill hero"
-              style={{ width: `${Math.max(0, (battleState.hero.hp / battleState.hero.maxHp) * 100)}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* 상황 지문 및 안내 메시지 */}
-      <div className="battle-message-box">
-        <p>{message}</p>
-      </div>
-
-      {/* 코드 표시 영역 (§6-2) */}
-      <div className="battle-code-box">
-        <pre>{codeDisplay}</pre>
-      </div>
-
-      {/* 조작 버튼 영역 */}
-      <div className="battle-actions">
-        {phase === 'encounter-choice' && (
-          <div className="battle-choice-buttons">
-            {isSleepingCard ? (
-              <>
-                <button type="button" className="game-button-primary" onClick={handleFight}>
-                  깨워서 싸운다
-                </button>
-                <button type="button" onClick={handleSneak}>
-                  몰래 지나간다 ({sleepDepth === 'light' ? '성공률 낮음' : '성공률 높음'})
-                </button>
-              </>
-            ) : (
-              <>
-                <button type="button" className="game-button-primary" onClick={handleFight}>
-                  싸운다 (유저 선공)
-                </button>
-                <button type="button" onClick={handleFlee}>
-                  도망간다 (확률: {heroHitPct}%)
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
-        {(phase === 'ambush-alert' || phase === 'flee-failed') && (
-          <button type="button" className="game-button-primary" onClick={() => setPhase('in-battle')}>
-            전투 시작
-          </button>
-        )}
-
-        {phase === 'in-battle' && (
-          <div className="battle-in-fight-buttons">
-            <button
-              type="button"
-              className="game-button-primary"
-              disabled={battleState.activeActor !== 'hero'}
-              onClick={() => handleHeroAction('attack')}
-            >
-              {battleState.hero.charged ? '차지 공격 (2.2배)' : '일반 공격'}
-            </button>
-            <button
-              type="button"
-              disabled={battleState.activeActor !== 'hero'}
-              onClick={() => handleHeroAction('defend')}
-            >
-              {battleState.hero.charged ? '카운터 (패링 반사)' : '방어 (피해 감소)'}
-            </button>
-            <button
-              type="button"
-              disabled={battleState.activeActor !== 'hero' || battleState.hero.charged}
-              onClick={() => handleHeroAction('charge')}
-              title={battleState.hero.charged ? '연속 차지 불가' : '다음 공격/방어 강화'}
-            >
-              차지 (기 모으기)
-            </button>
-            {battleState.activeActor === 'mob' && (
-              <span className="battle-turn-indicator">몬스터 차례...</span>
-            )}
-          </div>
-        )}
-
-        {phase === 'victory' && (
-          <div className="battle-result-box" style={{ width: '100%' }}>
-            <div style={{ color: '#86efac', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-              승리! 몬스터를 물리쳤다.
-            </div>
-
-            {/* 미션템 자동 수집 알림 (§4-6) */}
-            {collectedMissionQuality && missionContext && (
-              <div
-                className="battle-mission-collect-notice"
-                style={{
-                  background: 'rgba(56, 189, 248, 0.15)',
-                  border: '1px solid #38bdf8',
-                  borderRadius: 4,
-                  padding: '4px 8px',
-                  marginBottom: 8,
-                  fontSize: 11,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <PixelSprite id={missionContext.item.assetId} scale={1} />
-                <span>
-                  <strong>[의뢰품 자동 수집]</strong> {missionContext.item.name} (
-                  <span
-                    style={{
-                      color:
-                        collectedMissionQuality === 'shining'
-                          ? '#fef08a'
-                          : collectedMissionQuality === 'broken'
-                            ? '#fca5a5'
-                            : '#86efac',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {collectedMissionQuality === 'shining'
-                      ? '빛나는'
-                      : collectedMissionQuality === 'broken'
-                        ? '부서진'
-                        : '일반'}
-                  </span>
-                  ) 획득!
+    <div className="battle-floats-container">
+      {/* 1. 승리 시 보상 선택 오버레이 (v9.1 .reward-floats) */}
+      {phase === 'victory' && (
+        <div className="reward-floats">
+          <div className="float-panel reward-title">
+            <div className="trophy">✦</div>
+            <h2>전투 승리!</h2>
+            {collectedMissionQuality && missionContext ? (
+              <p>
+                <strong>[의뢰품 자동 수집]</strong> {missionContext.item.name} (
+                <span
+                  style={{
+                    color:
+                      collectedMissionQuality === 'shining'
+                        ? '#ffd700'
+                        : collectedMissionQuality === 'broken'
+                          ? '#f87171'
+                          : '#86efac',
+                    fontWeight: 800,
+                  }}
+                >
+                  {collectedMissionQuality === 'shining'
+                    ? '빛나는'
+                    : collectedMissionQuality === 'broken'
+                      ? '부서진'
+                      : '일반'}
                 </span>
-              </div>
-            )}
-
-            {/* 보상 선택 (2택 1) (§4-6) */}
-            {rewardChoices ? (
-              <div className="battle-reward-selection" style={{ marginTop: 4 }}>
-                <div style={{ fontSize: 11, color: '#cbd5e1', marginBottom: 6 }}>
-                  전리품 보상 선택 (2개 중 택 1 · 즉시 적용):
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  <button
-                    type="button"
-                    className="game-button-primary battle-reward-btn"
-                    style={{
-                      padding: '6px 4px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 2,
-                      fontSize: 11,
-                      lineHeight: 1.2,
-                    }}
-                    onClick={() =>
-                      onVictory(
-                        battleState.totalMobDamageTaken,
-                        rewardChoices.optionA,
-                        collectedMissionQuality,
-                        battleState.hero.hp,
-                        currentEffects,
-                      )
-                    }
-                  >
-                    <PixelSprite id={rewardChoices.optionA.assetId} scale={1} />
-                    <strong style={{ marginTop: 2 }}>{rewardChoices.optionA.name}</strong>
-                    <span style={{ fontSize: 9, opacity: 0.9 }}>
-                      {rewardChoices.optionA.description}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="game-button-primary battle-reward-btn"
-                    style={{
-                      padding: '6px 4px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 2,
-                      fontSize: 11,
-                      lineHeight: 1.2,
-                    }}
-                    onClick={() =>
-                      onVictory(
-                        battleState.totalMobDamageTaken,
-                        rewardChoices.optionB,
-                        collectedMissionQuality,
-                        battleState.hero.hp,
-                        currentEffects,
-                      )
-                    }
-                  >
-                    <PixelSprite id={rewardChoices.optionB.assetId} scale={1} />
-                    <strong style={{ marginTop: 2 }}>{rewardChoices.optionB.name}</strong>
-                    <span style={{ fontSize: 9, opacity: 0.9 }}>
-                      {rewardChoices.optionB.description}
-                    </span>
-                  </button>
-                </div>
-              </div>
+                ) 획득 완료!
+                <br />
+                전투 전리품은 두 가지 중 하나를 선택하세요.
+              </p>
             ) : (
+              <p>
+                의뢰품은 대상 몹 처치 시 자동 수집됩니다.
+                <br />
+                전투 보상은 두 가지 중 하나를 선택하세요.
+              </p>
+            )}
+          </div>
+
+          {rewardChoices ? (
+            <div className="reward-choices">
               <button
                 type="button"
-                className="game-button-primary"
+                id="rewardA"
+                onClick={() =>
+                  onVictory(
+                    battleState.totalMobDamageTaken,
+                    rewardChoices.optionA,
+                    collectedMissionQuality,
+                    battleState.hero.hp,
+                    currentEffects,
+                  )
+                }
+              >
+                <span className="tag">
+                  {rewardChoices.optionA.type === 'permanent'
+                    ? 'A · 영구 스탯'
+                    : rewardChoices.optionA.type === 'combat'
+                      ? 'A · 공방 효과'
+                      : rewardChoices.optionA.type === 'vital'
+                        ? 'A · 피 효과'
+                        : 'A · 보너스'}
+                </span>
+                <b>{rewardChoices.optionA.name}</b>
+                <small>{rewardChoices.optionA.description}</small>
+                <div className="reward-icon-box">
+                  <PixelSprite id={rewardChoices.optionA.assetId} scale={0.7} />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                id="rewardB"
+                onClick={() =>
+                  onVictory(
+                    battleState.totalMobDamageTaken,
+                    rewardChoices.optionB,
+                    collectedMissionQuality,
+                    battleState.hero.hp,
+                    currentEffects,
+                  )
+                }
+              >
+                <span className="tag">
+                  {rewardChoices.optionB.type === 'permanent'
+                    ? 'B · 영구 스탯'
+                    : rewardChoices.optionB.type === 'combat'
+                      ? 'B · 공방 효과'
+                      : rewardChoices.optionB.type === 'vital'
+                        ? 'B · 피 효과'
+                        : 'B · 보너스'}
+                </span>
+                <b>{rewardChoices.optionB.name}</b>
+                <small>{rewardChoices.optionB.description}</small>
+                <div className="reward-icon-box">
+                  <PixelSprite id={rewardChoices.optionB.assetId} scale={0.7} />
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="action-float">
+              <button
+                type="button"
+                className="gold-btn"
                 onClick={() =>
                   onVictory(
                     battleState.totalMobDamageTaken,
@@ -632,24 +507,143 @@ let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%
                   )
                 }
               >
-                다음으로 (참여 +1)
+                다음으로　◆
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 2. 패배 결과 안내 */}
+      {phase === 'defeat' && (
+        <div className="battle-result-card">
+          <h2>용사는 전투에서 힘이 다해 쓰러졌습니다.</h2>
+          <button
+            type="button"
+            className="gold-btn"
+            onClick={() => onDefeat(battleState.hero.hp, currentEffects)}
+          >
+            결과 확인
+          </button>
+        </div>
+      )}
+
+      {/* 3. 전투 전/전투 중 헤더 및 코드, 버튼 레이아웃 */}
+      {phase !== 'victory' && phase !== 'defeat' && (
+        <>
+          {/* 상단: 몹 프레임 및 HP 바 */}
+          <div className="battle-head float-panel">
+            <div className="battle-main">
+              <div className="battle-art">
+                <PixelSprite
+                  id={isSleepingCard && phase === 'encounter-choice' ? 'event-sleeping-mob-128' : mobAssetId}
+                  palette={isSleepingCard && phase === 'encounter-choice' ? undefined : getAssetRegionPalette(mobAssetId, region)}
+                  scale={1.2}
+                />
+              </div>
+              <div className="battle-data">
+                <small>
+                  MONSTER ENCOUNTER · {region.toUpperCase()}
+                  {isSleepingCard ? ' · 잠든 몹' : ''}
+                </small>
+                <h2>
+                  <strong style={{ fontWeight: 900 }}>{battleState.mob.name}</strong>
+                  {battleState.mob.charged && <span className="badge charge">차지</span>}
+                  {battleState.mob.defending && <span className="badge defend">방어</span>}
+                  {battleState.mob.countering && <span className="badge counter">카운터</span>}
+                </h2>
+                <div className="enemy-hp">
+                  <div
+                    className="fill"
+                    style={{ width: `${Math.max(0, (battleState.mob.hp / battleState.mob.maxHp) * 100)}%` }}
+                  />
+                </div>
+                <div className="enemy-hp-num">
+                  <span>HP</span>
+                  <span>{Math.max(0, battleState.mob.hp)} / {battleState.mob.maxHp}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="battle-status">
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{message}</span>
+              <span>
+                TURN <b>{String(battleState.turnCount + 1).padStart(2, '0')}</b>
+              </span>
+            </div>
+          </div>
+
+          {/* 중앙: 코드 패널 */}
+          <pre className="code-panel battle-code" aria-label="전투 코드">
+            {codeDisplay}
+          </pre>
+
+          {/* 하단: 액션 버튼군 */}
+          <div className="battle-actions">
+            {phase === 'encounter-choice' && (
+              isSleepingCard ? (
+                <>
+                  <button type="button" className="gold-btn" onClick={handleFight}>
+                    깨워서 싸운다
+                  </button>
+                  <button type="button" className="light-btn" onClick={handleSneak}>
+                    몰래 지나간다 ({sleepDepth === 'light' ? '선잠' : '깊은잠'})
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="gold-btn" onClick={handleFight}>
+                    싸운다
+                  </button>
+                  <button type="button" className="light-btn" onClick={handleFlee}>
+                    도망간다 ({heroHitPct}%)
+                  </button>
+                </>
+              )
+            )}
+
+            {(phase === 'ambush-alert' || phase === 'flee-failed') && (
+              <button
+                type="button"
+                className="gold-btn"
+                style={{ flex: 1 }}
+                onClick={() => setPhase('in-battle')}
+              >
+                전투 시작
               </button>
             )}
-          </div>
-        )}
 
-        {phase === 'defeat' && (
-          <div className="battle-result-box">
-            <span style={{ color: '#f87171', fontWeight: 600 }}>패배... 용사가 쓰러졌다.</span>
-            <button
-              type="button"
-              onClick={() => onDefeat(battleState.hero.hp, currentEffects)}
-            >
-              결과 확인
-            </button>
+            {phase === 'in-battle' && (
+              <>
+                <button
+                  type="button"
+                  className="gold-btn"
+                  disabled={battleState.activeActor !== 'hero'}
+                  onClick={() => handleHeroAction('attack')}
+                >
+                  {battleState.hero.charged ? '차지공격' : '공격'}
+                </button>
+                <button
+                  type="button"
+                  className="light-btn"
+                  disabled={battleState.activeActor !== 'hero'}
+                  onClick={() => handleHeroAction('defend')}
+                >
+                  {battleState.hero.charged ? '카운터' : '방어'}
+                </button>
+                <button
+                  type="button"
+                  className="light-btn"
+                  disabled={battleState.activeActor !== 'hero' || battleState.hero.charged}
+                  onClick={() => handleHeroAction('charge')}
+                >
+                  차지
+                </button>
+              </>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

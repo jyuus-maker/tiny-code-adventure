@@ -34,12 +34,12 @@ export const ROAD_GEOMETRY = {
   distantScale: 6.25,
 } as const;
 
-// TEMP: 연출 길이 초안 (ms). 연출 중 입력 잠금
+// TEMP: 연출 길이 초안 (ms). 텀 2배 조정 (사용자 요청 #3)
 export const ROAD_ANIM = {
-  advanceMs: 520,
-  riseMs: 380,
-  modalMs: 220,
-  exitMs: 480,
+  advanceMs: 1040,
+  riseMs: 760,
+  modalMs: 440,
+  exitMs: 960,
 } as const;
 
 /** 소품 한 주기의 슬롯 수. 주기 길이 = cardStep × 슬롯 수 */

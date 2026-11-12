@@ -14,21 +14,36 @@ import {
 } from './types';
 
 /**
- * 배틀 미션 미션템 품질 판정 (§4-6)
- * - 전투 중 유저 차지공격 기록:
- *   - 크리티컬만 -> 빛나는(shining)
- *   - 빗맞힘만 -> 부서진(broken)
- *   - 둘 다 있거나 둘 다 없음 -> 일반(normal) (상쇄)
- *   - 헛스윙과 카운터는 품질 기록에서 제외
+ * 배틀 미션 미션템 품질 판정 (§4-6, §12-3 정정)
+ * - 대상 몹을 처치한 마지막 유효 피해(막타)의 타격 분류에 따른 확률 추첨
+ * - 전투 선택 보상의 등급과 동일한 막타 유형별 가중치 적용:
+ *   - 일반 평타·충전 평타·일반 반격·미충전 크리티컬 -> 빛나는 2 : 일반 5 : 부서진 3
+ *   - 충전 크리티컬·반격 크리티컬 -> 빛나는 3 : 일반 4 : 부서진 3
+ *   - 빗맞힘(충전 포함) -> 빛나는 2 : 일반 4 : 부서진 4
+ *   - 미믹: 빛나는 제외 후 재정규화 (5:3, 4:3, 4:4)
  */
-export function determineMissionItemQuality(log: QualityLog): ItemGrade {
-  if (log.hasChargeCrit && !log.hasChargeGraze) {
-    return 'shining';
+export function determineMissionItemQuality(
+  logOrGrade: QualityLog | HitGrade | null,
+  lastActionTypeOrRng: 'attack' | 'counter' | 'other' | null | Rng = 'attack',
+  wasCharged: boolean = false,
+  isMimic: boolean = false,
+  rng: Rng = Math.random,
+): ItemGrade {
+  if (logOrGrade && typeof logOrGrade === 'object' && 'lastHitGrade' in logOrGrade) {
+    const log = logOrGrade as QualityLog;
+    const actualRng = typeof lastActionTypeOrRng === 'function' ? lastActionTypeOrRng : rng;
+    return rollRewardGrade(
+      log.lastHitGrade,
+      log.lastActionType,
+      log.lastHitWasCharged,
+      isMimic,
+      actualRng,
+    );
   }
-  if (!log.hasChargeCrit && log.hasChargeGraze) {
-    return 'broken';
-  }
-  return 'normal';
+  const grade = logOrGrade as HitGrade | null;
+  const actionType = (typeof lastActionTypeOrRng === 'string' ? lastActionTypeOrRng : 'attack') as 'attack' | 'counter' | 'other' | null;
+  const actualRng = typeof lastActionTypeOrRng === 'function' ? lastActionTypeOrRng : rng;
+  return rollRewardGrade(grade, actionType, wasCharged, isMimic, actualRng);
 }
 
 /** 막타 타격 가중치 그룹 분류 (§4-6) */
@@ -110,6 +125,8 @@ export function rollRewardGrade(
   if (r < wShining + wNormal) return 'normal';
   return 'broken';
 }
+
+export const rollRewardQuality = rollRewardGrade;
 
 /** 피템 3종 옵션 정의 (§4-7) */
 export function createVitalOptions(

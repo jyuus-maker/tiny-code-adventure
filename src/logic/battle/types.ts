@@ -65,6 +65,7 @@ export type ActionResolution = {
   turnNumber: number;
   actor: ParticipantKind;
   action: ActionKind;
+  wasCharged: boolean;
   hitRate: number;
   isHit: boolean;
   hitGrade: HitGrade;
@@ -88,6 +89,7 @@ export type QualityLog = {
   lastHitGrade: HitGrade | null;
   lastHitByHero: boolean;
   lastActionType: 'attack' | 'counter' | 'other' | null;
+  lastHitWasCharged: boolean;
 };
 
 export type BattleState = {

@@ -1,9 +1,7 @@
 import { PixelSprite } from '../../render/PixelSprite';
 import type { MissionContext } from '../gameState';
 
-const MISSION_SCENE_SCALE = 2;
-
-const KIND_LABEL = { battle: '배틀', explore: '탐색' } as const;
+const KIND_LABEL = { battle: '배틀 의뢰', explore: '탐색 의뢰' } as const;
 const DIFFICULTY_LABEL = { normal: '노멀', hard: '하드' } as const;
 
 export type MissionScreenProps = {
@@ -15,32 +13,59 @@ export function MissionScreen({ context, onDepart }: MissionScreenProps) {
   const { mission, client, item } = context;
 
   return (
-    <div className="game-screen">
-      <div className="game-screen-header">
-        <h2>의뢰</h2>
-        <span className="game-screen-note">
-          {KIND_LABEL[mission.kind]} · {DIFFICULTY_LABEL[mission.difficulty]}
-        </span>
-      </div>
+    <section className="screen mission-screen" data-scene="mission">
+      <div className="pix-bg" />
+      <div className="mission-backdrop" />
+      <div className="dim" />
 
-      <div className="game-row">
-        <div className="game-sprite-box">
-          <PixelSprite id={client.sceneAssetId} scale={MISSION_SCENE_SCALE} />
+      <div className="mission-modal">
+        {/* 상단 헤더 */}
+        <div className="mh">
+          <b>◆　오늘의 의뢰</b>
+          <span>
+            {KIND_LABEL[mission.kind]}　/　{DIFFICULTY_LABEL[mission.difficulty]}
+          </span>
         </div>
-        <div className="game-panel" style={{ flex: 1 }}>
-          <h3>{client.name}</h3>
-          <p style={{ marginTop: 8 }}>{mission.dialogue}</p>
-          <p className="game-screen-note" style={{ marginTop: 12 }}>
-            의뢰품: {item.name} × {mission.count}
-          </p>
-        </div>
-      </div>
 
-      <div className="game-screen-footer">
-        <button type="button" className="game-button-primary" onClick={onDepart}>
-          출발
-        </button>
+        {/* 미션 본문 내용 */}
+        <div className="mission-content">
+          {/* 의뢰인 초상화 아트 */}
+          <div className="client-art">
+            <div className="sprite-holder">
+              <PixelSprite id={client.sceneAssetId} scale={2} />
+            </div>
+            <span>{client.name}</span>
+          </div>
+
+          {/* 의뢰 텍스트 정보 */}
+          <div className="mission-info">
+            <div className="mission-desc">
+              <div className="mini">THE REQUEST · VILLAGE QUEST</div>
+              <h2>{item.name}을(를) 구해 주세요.</h2>
+              <p className="speaker">{client.name}</p>
+              <blockquote>{mission.dialogue}</blockquote>
+            </div>
+
+            <div className="objective">
+              <span className="objective-ic">◈</span>
+              <div>
+                <small>의뢰 목표</small>
+                <b>
+                  {item.name} <em>× {mission.count}</em>
+                </b>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 하단 확인 및 수락 버튼 */}
+        <div className="mission-bottom">
+          <span>의뢰를 확인하고 출발해 주세요.</span>
+          <button className="gold-btn" type="button" onClick={onDepart}>
+            의뢰 수락　◆
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
