@@ -42,6 +42,12 @@ import type { ItemGrade } from '../../render/types';
 import { PixelSprite } from '../../render/PixelSprite';
 import { getAssetRegionPalette } from '../../render/region';
 
+const REGION_NAME_MAP: Record<Region, string> = {
+  warm: 'TS평원',
+  desert: 'Java사막',
+  cold: 'JS설원',
+};
+
 export type BattleModalProps = {
   card: MobCardDef;
   region: Region;
@@ -51,6 +57,8 @@ export type BattleModalProps = {
   heroEffects?: HeroEffectState | null;
   missionContext?: MissionContext | null;
   config?: BattleConfig;
+  /** 강제 전투 여부 (상자 미믹 또는 출렁다리 강제 조우, 도망/기습 재추첨 금지 §4-3) */
+  forcedEncounter?: boolean;
   onVictory: (
     totalDamage: number,
     reward?: RewardOption,
@@ -83,6 +91,7 @@ export function BattleModal({
   heroEffects = null,
   missionContext = null,
   config = DEFAULT_BATTLE_CONFIG,
+  forcedEncounter = false,
   onVictory,
   onFleeSuccess,
   onDefeat,
@@ -98,13 +107,15 @@ export function BattleModal({
   const actualMobId = sleepingInfo ? sleepingInfo.actualMobId : card.mobId ?? 'stone-shell-turtle';
   const sleepDepth: SleepDepth | null = sleepingInfo ? sleepingInfo.depth : null;
 
-  // 2. 조우 스타일 판정 (일반: 70% 일반 vs 30% 기습)
-  const [encounterType] = useState<'normal' | 'ambush' | 'sleeping'>(() => {
+  // 2. 조우 스타일 판정 (일반: 70% 일반 vs 30% 기습, 강제 전투는 도망/기습 재추첨 금지 §4-3)
+  const [encounterType] = useState<'normal' | 'ambush' | 'sleeping' | 'forced'>(() => {
+    if (forcedEncounter) return 'forced';
     if (isSleepingCard) return 'sleeping';
     return rollEncounterStyle();
   });
 
   const [phase, setPhase] = useState<BattlePhase>(() => {
+    if (forcedEncounter) return 'in-battle';
     if (encounterType === 'ambush') return 'ambush-alert';
     return 'encounter-choice';
   });
@@ -147,6 +158,11 @@ export function BattleModal({
   });
 
   const [message, setMessage] = useState<string>(() => {
+    if (forcedEncounter) {
+      return actualMobId === 'mimic'
+        ? '상자가 미믹으로 변했다! 전투가 시작된다.'
+        : '돌아가는 길에 몬스터를 마주쳤다! 전투가 시작된다.';
+    }
     if (encounterType === 'ambush') return '기습을 당했다! 몬스터가 먼저 공격해 온다!';
     if (encounterType === 'sleeping') {
       return sleepDepth === 'light'
@@ -190,18 +206,23 @@ export function BattleModal({
       }
     }
 
-    // 행동 종료 틱 1회 실행 (§4-7)
-    let updatedHeroHp = next.hero.hp;
-    if (res.tickExecuted && currentEffects) {
-      const effectsBeforeTick: HeroEffectState = {
-        ...currentEffects,
-        currentHp: updatedHeroHp,
-        isDead: updatedHeroHp <= 0,
-      };
-      const tickedEffects = tickEffects(effectsBeforeTick);
-      setCurrentEffects(tickedEffects);
-      onTick?.(tickedEffects);
-      updatedHeroHp = tickedEffects.currentHp;
+    // 행동 종료 틱 및 HUD 실시간 체력 동기화 (§4-7)
+    let updatedHeroHp = Math.max(0, next.hero.hp);
+    if (currentEffects) {
+      const baseEffects = res.tickExecuted
+        ? tickEffects({
+            ...currentEffects,
+            currentHp: updatedHeroHp,
+            isDead: updatedHeroHp <= 0,
+          })
+        : {
+            ...currentEffects,
+            currentHp: updatedHeroHp,
+            isDead: updatedHeroHp <= 0,
+          };
+      setCurrentEffects(baseEffects);
+      onTick?.(baseEffects);
+      updatedHeroHp = baseEffects.currentHp;
     }
 
     const stateWithTickedHp: BattleState = {
@@ -231,7 +252,7 @@ export function BattleModal({
         timeOfDay,
         mobId: stateWithTickedHp.mob.id,
         mobName: stateWithTickedHp.mob.name,
-        encounterType,
+        encounterType: encounterType === 'forced' ? 'normal' : encounterType,
         fled: false,
         winner: stateWithTickedHp.winner ?? 'mob',
         turnCount: stateWithTickedHp.turnCount,
@@ -261,9 +282,14 @@ export function BattleModal({
         // 1. 배틀 미션 대상 몹 처치 시 미션템 품질 판정 (§4-6, §12-3)
         // 대상 몹 처치 막타 타격 유형별 가중치 추첨 적용 (보상과 분리된 독립 추첨)
         const isMissionTarget =
-          missionContext?.mission.kind === 'battle' &&
-          (actualMobId === missionContext.mission.targetMobId ||
-            card.mobId === missionContext.mission.targetMobId);
+          (missionContext?.mission.kind === 'battle' &&
+            (actualMobId === missionContext.mission.targetMobId ||
+              card.mobId === missionContext.mission.targetMobId)) ||
+          // 미믹 경유 탐색 미션 또는 자물쇠공 의뢰 (§4-8, §4-9)
+          (actualMobId === 'mimic' &&
+            (missionContext?.mission.kind === 'explore' ||
+              missionContext?.mission.targetMobId === 'mimic' ||
+              missionContext?.mission.targetItemId === 'mimic-lock'));
 
         let q: ItemGrade | null = null;
         if (isMissionTarget) {
@@ -344,7 +370,7 @@ export function BattleModal({
         timeOfDay,
         mobId: battleState.mob.id,
         mobName: battleState.mob.name,
-        encounterType,
+        encounterType: encounterType === 'forced' ? 'normal' : encounterType,
         fled: true,
         winner: 'fled',
         turnCount: 0,
@@ -543,7 +569,7 @@ let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%
               </div>
               <div className="battle-data">
                 <small>
-                  MONSTER ENCOUNTER · {region.toUpperCase()}
+                  MONSTER ENCOUNTER · {REGION_NAME_MAP[region]}
                   {isSleepingCard ? ' · 잠든 몹' : ''}
                 </small>
                 <h2>

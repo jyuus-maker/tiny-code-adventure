@@ -15,8 +15,11 @@
 
 .game-frame .road-distant {
   position: absolute;
-  left: 50%;
+  left: 0;
+  top: 0;
+  width: 100%;
   pointer-events: none;
+  overflow: hidden;
 }
 
 /* 길 바닥: 프레임 아래 가장자리를 축으로 눕힌다 */
@@ -132,7 +135,8 @@
 .game-frame .road-prop {
   position: absolute;
   bottom: 0;
-  margin-left: -48px;
+  /* 지형지물 에셋 128px × 표시 배율 1(propScale) = 128px 폭의 절반(-64px). x는 길 중심에서 소품 중심까지 거리 */
+  margin-left: -64px;
   transform-origin: 50% 100%;
   transition: transform var(--road-advance) ease-in-out;
   pointer-events: none;

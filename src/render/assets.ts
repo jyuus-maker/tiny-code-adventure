@@ -1,3 +1,4 @@
+import { getTerrainAsset } from './terrainAssets';
 import type { PixelProjectData, RegisteredPixelAsset } from './types';
 
 type PixelModule = {
@@ -56,8 +57,13 @@ for (const [path, mod] of Object.entries(modules)) {
   });
 }
 
+/**
+ * id로 에셋 조회. 파일당 1장 레지스트리에 없으면 지형지물 통합 파일(terrainAssets)로 폴백한다.
+ * 지형지물 id는 원본 이름(`ts_prop_wayfinder_128.png`처럼 `.png` 포함)이라 기존 id와 겹치지 않는다.
+ * 이 폴백 덕분에 PixelSprite·getAssetRects(세로 병합 SVG 변환·캐시)를 지형지물에도 그대로 쓴다.
+ */
 export function getAsset(id: string): RegisteredPixelAsset | undefined {
-  return assetMap.get(id);
+  return assetMap.get(id) ?? getTerrainAsset(id);
 }
 
 export function getAllAssets(): RegisteredPixelAsset[] {

@@ -248,17 +248,25 @@
   background: #2c4356;
 }
 
-.title-screen .pix-bg {
+.title-screen .pix-bg,
+.prep-screen .pix-bg,
+.mission-screen .pix-bg,
+.ready-screen .pix-bg,
+.end-screen .pix-bg {
   filter: brightness(0.72) saturate(0.89);
   transform: scale(1.03);
 }
 
-.title-screen .title-haze {
+.title-screen .title-haze,
+.prep-screen .title-haze,
+.end-screen .title-haze,
+.title-haze {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, #121a2ce8 0%, #1b2336d8 42%, #152d3b39 78%, #0f172866),
-    linear-gradient(0deg, #131923d9, transparent 48%);
+    linear-gradient(90deg, rgba(18, 26, 44, 0.85) 0%, rgba(27, 35, 54, 0.75) 42%, rgba(21, 45, 59, 0.22) 78%, rgba(15, 23, 40, 0.40) 100%),
+    linear-gradient(0deg, rgba(19, 25, 35, 0.85) 0%, transparent 48%);
+  pointer-events: none;
 }
 
 .title-screen .top-line {
@@ -1448,6 +1456,20 @@
   display: flex;
   gap: 12px;
   justify-content: center;
+}
+
+/* 고대 제단 4개 선택지 */
+.event-floats .action-float:has(button:nth-child(4)) {
+  left: 214px;
+  width: 372px;
+  gap: 6px;
+}
+
+.event-floats .action-float:has(button:nth-child(4)) button {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+  padding: 0 4px;
 }
 
 .action-float .gold-btn,

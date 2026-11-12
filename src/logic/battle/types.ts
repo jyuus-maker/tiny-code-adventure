@@ -31,10 +31,14 @@ export type BattleConfig = {
   tickOnDirectDeath: boolean;
 };
 
+// CHK08 전투 공식 리팩토링 v1.0 기준: 기존 데미지 산출 공식에 10배 배율 적용 (1회당 약 50~200)
+// TEMP: 배율 상수 분리 (추후 v1.1 개정 시 공식 조정 또는 변경 관리)
+export const BATTLE_DAMAGE_MULTIPLIER = 10;
+
 // TEMP: CHK 08 기본 테스트 설정값 (승인된 초기 가안)
 export const DEFAULT_BATTLE_CONFIG: BattleConfig = {
   damageMode: 'scaled',
-  damageScale: 10,
+  damageScale: BATTLE_DAMAGE_MULTIPLIER,
   minDamage: 1,
   defenseRate: 1.0,
   chargeMultiplier: 2.2,

@@ -1,5 +1,9 @@
 import { HP_PER_POINT } from '../../config';
+import { PixelSprite } from '../../render/PixelSprite';
+import { GAME_FRAME_HEIGHT, GAME_FRAME_WIDTH } from '../frame';
 import type { StatRollResult } from '../gameState';
+
+const TITLE_BG_ASSET_ID = 'bg-title-adventure-512';
 
 export type StatRollScreenProps = {
   roll: StatRollResult;
@@ -17,8 +21,16 @@ export function StatRollScreen({
 
   return (
     <section className="screen prep-screen" data-scene="stat">
-      <div className="pix-bg" />
-      <div className="darkwash" />
+      {/* 배경 아트 & 딤 (타이틀과 동일한 800x500 배경 + 딤 적용) */}
+      <div className="pix-bg" aria-hidden="true">
+        <PixelSprite
+          id={TITLE_BG_ASSET_ID}
+          width={GAME_FRAME_WIDTH}
+          height={GAME_FRAME_HEIGHT}
+          preserveAspectRatio="none"
+        />
+      </div>
+      <div className="title-haze" aria-hidden="true" />
 
       <div className="gold-panel prep-wrap">
         <div className="prep-heading">CREATE YOUR HERO</div>

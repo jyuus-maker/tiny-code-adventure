@@ -91,6 +91,33 @@ export type CardWeights = Readonly<Record<string, number>>;
 // TEMP: 개발 테스트용 균등 가중치 (운영 출현 비율 아님)
 export const DEFAULT_CARD_WEIGHTS: CardWeights = {};
 
+/**
+ * 미션 상태에 따른 카드 가중치 계산 (§4-9)
+ * - 미션 대상 출현 배율: 달성 전 1.5, 달성 후 0.5 초기값
+ * - 배틀 미션: targetMobId 가중치 조절
+ * - 상자/미믹 미션: suspicious-chest 가중치 조절
+ * - 제단은 희귀 출현 가중치 (0.5 가안 // TEMP)
+ */
+export function computeMissionCardWeights(
+  missionKind?: 'battle' | 'explore' | null,
+  targetMobId?: string | null,
+  isCompleted: boolean = false,
+): CardWeights {
+  const multiplier = isCompleted ? 0.5 : 1.5;
+  const weights: Record<string, number> = {
+    // 고대 제단은 희귀 출현 가중치 (§4-8) // TEMP
+    altar: 0.5,
+  };
+
+  if (missionKind === 'explore' || targetMobId === 'mimic') {
+    weights['suspicious-chest'] = multiplier;
+  } else if (missionKind === 'battle' && targetMobId) {
+    weights[targetMobId] = multiplier;
+  }
+
+  return weights;
+}
+
 export class CardPoolExhaustedError extends Error {
   constructor(excluded: readonly string[]) {
     super(

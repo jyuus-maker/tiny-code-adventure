@@ -1,5 +1,6 @@
 import type { Rng } from '../rng';
 import {
+  BATTLE_DAMAGE_MULTIPLIER,
   DEFAULT_BATTLE_CONFIG,
   type ActionKind,
   type ActionResolution,
@@ -10,6 +11,8 @@ import {
   type ParticipantKind,
   type QualityLog,
 } from './types';
+
+export { BATTLE_DAMAGE_MULTIPLIER };
 
 /**
  * 명중률 계산 (§4-3, §4-4).
@@ -46,8 +49,7 @@ export function resolveHitGrade(
   return 'crit';
 }
 
-// TEMP: 사람 손으로 배틀 종료 테스트를 위해 계산된 데미지에 * 100 적용 (사용자 요청 #5)
-export const BATTLE_DAMAGE_MULTIPLIER = 100;
+// CHK08 전투 공식 리팩토링 v1.0 기준: 기존 데미지 산출 공식에 10배 배율 적용 (1회당 약 50~200)
 
 /**
  * 기본 피해량 계산식 (§4-4).
@@ -69,21 +71,11 @@ export function calculateDamage(
   const effectiveDef = defenderDef * config.defenseRate * (isDefending ? 1.5 : 1.0);
   const baseDiff = Math.max(0.1, attackerAtk - effectiveDef);
 
-  if (config.damageMode === 'scaled') {
-    return (
-      Math.max(
-        config.minDamage,
-        Math.round(baseDiff * config.damageScale * gradeMult * chargeMult),
-      ) * BATTLE_DAMAGE_MULTIPLIER
-    );
-  }
-
-  // points 기본 모드 (메인스펙 순수 기본식)
-  return (
-    Math.max(
-      config.minDamage,
-      Math.round(baseDiff * gradeMult * chargeMult),
-    ) * BATTLE_DAMAGE_MULTIPLIER
+  // CHK08 v1.0: 기존 산출 데미지에 10배 배율 적용 (약 50~200)
+  const scale = config.damageMode === 'scaled' ? config.damageScale : BATTLE_DAMAGE_MULTIPLIER;
+  return Math.max(
+    config.minDamage,
+    Math.round(baseDiff * scale * gradeMult * chargeMult),
   );
 }
 
@@ -104,20 +96,11 @@ export function calculateCounterReflection(
   const chargeMult = isCharged ? config.chargeMultiplier : 1.0;
   const baseDiff = Math.max(0.1, attackerAtk - attackerDef * config.defenseRate);
 
-  if (config.damageMode === 'scaled') {
-    return (
-      Math.max(
-        config.minDamage,
-        Math.round(baseDiff * config.damageScale * gradeMult * chargeMult * config.counterMultiplier),
-      ) * BATTLE_DAMAGE_MULTIPLIER
-    );
-  }
-
-  return (
-    Math.max(
-      config.minDamage,
-      Math.round(baseDiff * gradeMult * chargeMult * config.counterMultiplier),
-    ) * BATTLE_DAMAGE_MULTIPLIER
+  // CHK08 v1.0: 카운터 반사 데미지도 동일한 10배 배율 적용
+  const scale = config.damageMode === 'scaled' ? config.damageScale : BATTLE_DAMAGE_MULTIPLIER;
+  return Math.max(
+    config.minDamage,
+    Math.round(baseDiff * scale * gradeMult * chargeMult * config.counterMultiplier),
   );
 }
 

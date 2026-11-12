@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -32,6 +33,7 @@ import { GAME_FRAME_HEIGHT, GAME_FRAME_WIDTH } from '../frame';
 import {
   cardSlotDepth,
   computeHorizonY,
+  getPropVisualScale,
   getRoadColors,
   placeProps,
   ROAD_ANIM,
@@ -41,6 +43,14 @@ import {
   type RoadColors,
 } from '../road';
 import '../road.css';
+import { MOBS } from '../../data/mobs';
+import type { MobCardDef } from '../cards';
+import {
+  createEventInstance,
+  resolveEventChoice,
+  type EventResolution,
+  type EventType,
+} from '../../logic/events';
 
 const REGION_NAME_MAP: Record<Region, string> = {
   warm: 'TS평원',
@@ -86,22 +96,6 @@ type ModalRect = { left: number; top: number; width: number; height: number };
 
 const TIME_LABEL = { day: '낮', night: '밤' } as const;
 
-/** 개발 확인용 결과 입력. 실제 선택지·판정과 분리된 테스트 입력이다 */
-const DEV_OUTCOMES: readonly { kind: CardOutcomeKind; label: string; note: string }[] = [
-  { kind: 'pass', label: '패스', note: '참여 +0 · 옆으로 비켜남' },
-  { kind: 'participate', label: '참여 확정', note: '전투 진입/이벤트 참여 · 참여 +1' },
-  {
-    kind: 'pass-forced-battle',
-    label: '지나가기 → 강제 전투',
-    note: '출렁다리형 · 다리 +0, 전투 +1 (합계 +1)',
-  },
-  {
-    kind: 'participate-linked-battle',
-    label: '참여 → 연결 전투',
-    note: '상자 실패→미믹형 · 합계 +1',
-  },
-];
-
 export function AdventureScreen({
   adventure,
   participationCount,
@@ -126,15 +120,44 @@ export function AdventureScreen({
   const colors = getRoadColors(env.region, distantBgId);
   const pathPalette = getAssetRegionPalette(ROAD_TILE_ASSET_ID, env.region);
   const horizonY = computeHorizonY();
+  const activeId = active?.instanceId ?? null;
+
+  // 이벤트 관련 상태 (§5-4, §5-5)
+  const [prevActiveId, setPrevActiveId] = useState<number | null>(activeId);
+  const [eventResolution, setEventResolution] = useState<EventResolution | null>(null);
+  const [linkedBattleData, setLinkedBattleData] = useState<{
+    mobId: string;
+    isMimic: boolean;
+    forced: true;
+  } | null>(null);
+
+  // 카드가 변경되면 이벤트 상태 및 연결 전투 초기화
+  if (prevActiveId !== activeId) {
+    setPrevActiveId(activeId);
+    setEventResolution(null);
+    setLinkedBattleData(null);
+  }
+
+  // 활성 이벤트 인스턴스 데이터 생성
+  const eventInstance = useMemo(() => {
+    if (!active || active.def.kind !== 'event') return null;
+    return createEventInstance(
+      active.def.eventId as EventType,
+      env.region,
+      env.timeOfDay,
+      heroEffects,
+    );
+  }, [active, env.region, env.timeOfDay, heroEffects]);
 
   // 실시간 유효 스탯 계산 (§4-7)
-  const currentHp = heroEffects ? heroEffects.currentHp : heroStats.hp;
-  const maxHp = heroEffects ? getEffectiveMaxHp(heroEffects) : heroStats.maxHp;
-  const effectiveAtk = heroEffects ? getEffectiveAttack(heroEffects) : heroStats.attack;
-  const effectiveDef = heroEffects ? getEffectiveDefense(heroEffects) : heroStats.defense;
+  const effectiveHeroState = eventResolution ? eventResolution.nextEffects : heroEffects;
+  const currentHp = effectiveHeroState ? effectiveHeroState.currentHp : heroStats.hp;
+  const maxHp = effectiveHeroState ? getEffectiveMaxHp(effectiveHeroState) : heroStats.maxHp;
+  const effectiveAtk = effectiveHeroState ? getEffectiveAttack(effectiveHeroState) : heroStats.attack;
+  const effectiveDef = effectiveHeroState ? getEffectiveDefense(effectiveHeroState) : heroStats.defense;
 
-  const baseAtk = heroEffects ? heroEffects.baseAttack + heroEffects.permanentAttackBonus : heroStats.attack;
-  const baseDef = heroEffects ? heroEffects.baseDefense + heroEffects.permanentDefenseBonus : heroStats.defense;
+  const baseAtk = effectiveHeroState ? effectiveHeroState.baseAttack + effectiveHeroState.permanentAttackBonus : heroStats.attack;
+  const baseDef = effectiveHeroState ? effectiveHeroState.baseDefense + effectiveHeroState.permanentDefenseBonus : heroStats.defense;
 
   const atkDiff = effectiveAtk - baseAtk;
   const defDiff = effectiveDef - baseDef;
@@ -142,7 +165,6 @@ export function AdventureScreen({
   const activeCardRef = useRef<HTMLDivElement | null>(null);
   // 모달 위치는 "어느 카드의 open 단계에서 쟀는가"와 함께 보관해, 카드·단계가 바뀌면 자동으로 무효가 된다
   const [measured, setMeasured] = useState<{ forId: number; rect: ModalRect } | null>(null);
-  const activeId = active?.instanceId ?? null;
 
   // 최신 콜백을 ref에 보관해 타이머 효과가 단계·카드 변경 시에만 다시 걸리게 한다
   const latest = useRef({ onArrived, onExited });
@@ -189,8 +211,7 @@ export function AdventureScreen({
   const inputEnabled = modalRect !== null && !!active && !active.resolved;
   const tileSize = 128 * G.tileScale;
   const tileCount = Math.ceil(G.floorDepth / tileSize);
-  const distantSize = 128 * G.distantScale;
-  const props = placeProps(advanceCount);
+  const props = placeProps(advanceCount, env.region);
 
   return (
     <div
@@ -216,13 +237,17 @@ export function AdventureScreen({
         <div
           className="road-distant"
           style={{
-            width: distantSize,
-            marginLeft: -distantSize / 2,
-            top: horizonY - distantSize,
+            height: horizonY + 110,
+            top: -20,
           }}
           aria-hidden="true"
         >
-          <PixelSprite id={distantBgId} scale={G.distantScale} />
+          <PixelSprite
+            id={distantBgId}
+            width="100%"
+            height={horizonY + 110}
+            preserveAspectRatio="none"
+          />
         </div>
 
         <div
@@ -237,7 +262,12 @@ export function AdventureScreen({
         >
           <div
             className="road-strip"
-            style={{ width: tileSize, marginLeft: -tileSize / 2 }}
+            style={{
+              width: tileSize,
+              marginLeft: -tileSize / 2,
+              transform: 'scaleX(1.85)',
+              transformOrigin: '50% 100%',
+            }}
             aria-hidden="true"
           >
             {Array.from({ length: tileCount }, (_, i) => (
@@ -255,24 +285,29 @@ export function AdventureScreen({
             <TerrainProp key={`${p.def.id}-${p.wraps}`} placed={p} colors={colors} />
           ))}
 
-          {active && (
-            <RoadCard
-              ref={activeCardRef}
-              card={active}
-              slot={0}
-              stage={stage}
-              region={env.region}
-            />
-          )}
-          {preview.map((card, i) => (
-            <RoadCard
-              key={card.instanceId}
-              card={card}
-              slot={i + 1}
-              stage={null}
-              region={env.region}
-            />
-          ))}
+          {[
+            ...(active
+              ? [
+                  <RoadCard
+                    key={active.instanceId}
+                    ref={activeCardRef}
+                    card={active}
+                    slot={0}
+                    stage={stage}
+                    region={env.region}
+                  />,
+                ]
+              : []),
+            ...preview.map((card, i) => (
+              <RoadCard
+                key={card.instanceId}
+                card={card}
+                slot={i + 1}
+                stage={null}
+                region={env.region}
+              />
+            )),
+          ]}
         </div>
       </div>
 
@@ -371,10 +406,17 @@ export function AdventureScreen({
           {heroEffects?.combatSlot ? (
             <>
               <span className="buff-top">
-                {heroEffects.combatSlot.kind === 'atk-buff' ? 'AT' : 'DF'} +{heroEffects.combatSlot.value}
+                {heroEffects.combatSlot.kind.startsWith('atk') ? 'AT' : 'DF'}{' '}
+                {formatEffectValue(
+                  heroEffects.combatSlot.kind.endsWith('-buff'),
+                  heroEffects.combatSlot.value,
+                )}
               </span>
               <div className="buff-visual">
-                <div className={heroEffects.combatSlot.kind === 'atk-buff' ? 'spark' : 'shield'} />
+                <PixelSprite
+                  id={heroEffects.combatSlot.kind.startsWith('atk') ? 'ui-buff-attack-64' : 'ui-buff-defense-64'}
+                  scale={BUFF_ICON_SCALE}
+                />
               </div>
               <span className="buff-bottom">{heroEffects.combatSlot.remainingTurns}T</span>
               <div className="ui-tooltip">
@@ -407,12 +449,15 @@ export function AdventureScreen({
           {heroEffects?.vitalSlot ? (
             <>
               <span className="buff-top">
-                {heroEffects.vitalSlot.kind === 'temp-max-hp-up'
-                  ? `MAX +${heroEffects.vitalSlot.value}`
-                  : `HP +${heroEffects.vitalSlot.value}`}
+                {heroEffects.vitalSlot.kind.startsWith('temp-max-hp') ? 'MAX' : 'HP'}{' '}
+                {formatEffectValue(
+                  heroEffects.vitalSlot.kind === 'dot-heal' ||
+                    heroEffects.vitalSlot.kind === 'temp-max-hp-up',
+                  heroEffects.vitalSlot.value,
+                )}
               </span>
               <div className="buff-visual">
-                <div className="leaf" />
+                <PixelSprite id="ui-buff-life-64" scale={BUFF_ICON_SCALE} />
               </div>
               <span className="buff-bottom">{heroEffects.vitalSlot.remainingTurns}T</span>
               <div className="ui-tooltip">
@@ -483,20 +528,49 @@ export function AdventureScreen({
 
       {/* 7. 활성 카드 모달 (전투 모달 또는 일반 이벤트 모달: modalVisible 시점에 표시) */}
       {active && stage === 'open' && modalVisible && (
-        active.def.kind === 'mob' ? (
+        (active.def.kind === 'mob' || linkedBattleData !== null) ? (
           <BattleModal
-            card={active.def}
+            card={
+              linkedBattleData
+                ? linkedBattleData.isMimic
+                  ? {
+                      kind: 'mob',
+                      baseId: 'mimic',
+                      mobId: 'mimic',
+                      encounter: 'normal',
+                      name: '미믹',
+                      assetId: 'mob-mimic-64',
+                    }
+                  : {
+                      kind: 'mob',
+                      baseId: linkedBattleData.mobId,
+                      mobId: linkedBattleData.mobId,
+                      encounter: 'normal',
+                      name: MOBS.find((m) => m.id === linkedBattleData.mobId)?.name ?? '몬스터',
+                      assetId: MOBS.find((m) => m.id === linkedBattleData.mobId)?.assetId ?? 'mob-field-boar-64',
+                    }
+                : (active.def as MobCardDef)
+            }
             region={env.region}
             timeOfDay={env.timeOfDay}
             dayIndex={env.day}
             heroStats={heroStats}
             heroEffects={heroEffects}
             missionContext={missionContext}
+            forcedEncounter={linkedBattleData !== null}
             onVictory={(totalDamage, reward, quality, finalHp, finalEffects) => {
               onVictoryReward?.(reward, quality, totalDamage, finalHp, finalEffects);
-              onOutcome('participate');
+              const outcomeKind: CardOutcomeKind = linkedBattleData?.isMimic
+                ? 'participate-linked-battle'
+                : linkedBattleData
+                  ? 'pass-forced-battle'
+                  : 'participate';
+              onOutcome(outcomeKind);
             }}
-            onFleeSuccess={() => onOutcome('pass')}
+            onFleeSuccess={() => {
+              const outcomeKind: CardOutcomeKind = linkedBattleData ? 'pass-forced-battle' : 'pass';
+              onOutcome(outcomeKind);
+            }}
             onDefeat={(finalHp, finalEffects) => {
               onDefeat?.(finalHp, finalEffects);
             }}
@@ -506,46 +580,113 @@ export function AdventureScreen({
           <div className="event-floats">
             <div className="event-info float-panel">
               <div className="kicker">
-                ADVENTURE · EVENT · {env.region.toUpperCase()}
+                {eventResolution
+                  ? `ADVENTURE · EVENT · ${eventResolution.resultTitle}`
+                  : `ADVENTURE · EVENT · ${REGION_NAME_MAP[env.region]}`}
               </div>
-              <h2>{active.def.name}</h2>
+              <h2>{eventInstance?.name ?? active.def.name}</h2>
               <p>
-                길 위에서 사건이 발생했다.
-                <br />
-                선택지에 따라 결과가 결정됩니다.
+                {eventResolution ? (
+                  <>
+                    <span>{eventResolution.resultMessage}</span>
+                    {eventResolution.effectDescriptions.length > 0 && (
+                      <span style={{ display: 'block', color: '#b45309', fontWeight: 800, marginTop: 4 }}>
+                        효과: {eventResolution.effectDescriptions.join(', ')}
+                      </span>
+                    )}
+                    {eventResolution.missionItemCollected && (
+                      <span style={{ display: 'block', color: '#b45309', fontWeight: 800, marginTop: 2 }}>
+                        의뢰품: ✦ 빛나는 {missionContext?.item.name ?? '미션템'} 획득!
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  eventInstance?.situation ?? '길 위에서 사건이 발생했다.'
+                )}
               </p>
               <div className="art">
                 <PixelSprite
-                  id={active.def.assetId ?? 'event-herb-tree-128'}
+                  id={eventInstance?.assetId ?? active.def.assetId ?? 'event-herb-tree-128'}
                   scale={0.7}
                 />
               </div>
             </div>
 
             <pre className="code-panel event-code-panel float-panel" aria-label="이벤트 코드">
-{`let heroHp: number = ${currentHp};
-let region: string = "${env.region}";
-let isDay: boolean = ${!isNight};
-
-// 사건 분기 및 조건식 판정
-if (heroHp > 0) {
-  event.resolve();
-}`}
+              {eventResolution
+                ? `// 사건 판정 완료: ${eventResolution.resultTitle}\n${eventResolution.resultMessage}${
+                    eventResolution.effectDescriptions.length > 0
+                      ? `\n// 적용 효과: ${eventResolution.effectDescriptions.join(', ')}`
+                      : ''
+                  }`
+                : eventInstance?.codeLines.join('\n') ?? `// 이벤트 처리 준비 중`}
             </pre>
 
             <div className="action-float">
-              {DEV_OUTCOMES.slice(0, 2).map(({ kind, label, note }) => (
+              {!eventResolution ? (
+                eventInstance?.choices.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={c.isPass ? 'light-btn' : 'gold-btn'}
+                    disabled={!inputEnabled}
+                    onClick={() => {
+                      if (!eventInstance) return;
+                      const currentHero = effectiveHeroState ?? {
+                        baseAttack: heroStats.attack,
+                        baseDefense: heroStats.defense,
+                        baseMaxHp: heroStats.maxHp,
+                        permanentAttackBonus: 0,
+                        permanentDefenseBonus: 0,
+                        permanentHpBonus: 0,
+                        currentHp: heroStats.hp,
+                        combatSlot: null,
+                        vitalSlot: null,
+                        isDead: false,
+                      };
+                      const res = resolveEventChoice(eventInstance, c.id, currentHero);
+                      setEventResolution(res);
+                    }}
+                  >
+                    {c.label}
+                  </button>
+                ))
+              ) : eventResolution.linkedBattle ? (
                 <button
-                  key={kind}
                   type="button"
-                  className={kind === 'participate' ? 'gold-btn' : 'light-btn'}
-                  disabled={!inputEnabled}
-                  onClick={() => onOutcome(kind)}
-                  title={note}
+                  className="gold-btn"
+                  onClick={() => setLinkedBattleData(eventResolution.linkedBattle!)}
                 >
-                  {label}
+                  전투 돌입　⚔
                 </button>
-              ))}
+              ) : (
+                <button
+                  type="button"
+                  className="gold-btn"
+                  onClick={() => {
+                    if (eventResolution.missionItemCollected) {
+                      onVictoryReward?.(
+                        undefined,
+                        eventResolution.missionItemCollected.quality,
+                        0,
+                        eventResolution.nextEffects.currentHp,
+                        eventResolution.nextEffects,
+                      );
+                    } else if (eventResolution.nextEffects !== heroEffects) {
+                      onEffectsTick?.(eventResolution.nextEffects);
+                    }
+
+                    if (eventResolution.nextEffects.isDead) {
+                      onDefeat?.(eventResolution.nextEffects.currentHp, eventResolution.nextEffects);
+                      return;
+                    }
+
+                    onOutcome(eventResolution.outcomeKind);
+                  }}
+                >
+                  다음으로　◆
+                </button>
+              )}
             </div>
           </div>
         )
@@ -695,17 +836,19 @@ function RoadCard({ card, slot, stage, region, ref }: RoadCardProps) {
 function TerrainProp({ placed, colors }: { placed: PlacedProp; colors: RoadColors }) {
   const { def, depth } = placed;
   const transform = `translateY(${-depth}px) rotateX(${-G.floorTilt}deg)`;
+  const scale = def.customScale ?? getPropVisualScale(def.assetId, def.shape);
+  const marginLeft = -Math.round((128 * scale) / 2);
   return (
     <div
       className="road-prop"
       data-prop-id={def.id}
-      style={{ left: `calc(50% + ${def.x}px)`, transform }}
+      style={{ left: `calc(50% + ${def.x}px)`, transform, marginLeft }}
       aria-hidden="true"
     >
       {def.assetId ? (
-        <PixelSprite id={def.assetId} scale={G.tileScale} />
+        <PixelSprite id={def.assetId} scale={scale} />
       ) : (
-        <PlaceholderShape shape={def.shape} colors={colors} />
+        <PlaceholderShape shape={def.shape} colors={colors} scale={scale} />
       )}
     </div>
   );
@@ -714,13 +857,20 @@ function TerrainProp({ placed, colors }: { placed: PlacedProp; colors: RoadColor
 function PlaceholderShape({
   shape,
   colors,
+  scale = 1,
 }: {
   shape: PlacedProp['def']['shape'];
   colors: RoadColors;
+  scale?: number;
 }) {
   if (shape === 'tree') {
     return (
-      <svg width="96" height="120" viewBox="0 0 96 120" shapeRendering="crispEdges">
+      <svg
+        width={Math.round(48 * scale)}
+        height={Math.round(60 * scale)}
+        viewBox="0 0 96 120"
+        shapeRendering="crispEdges"
+      >
         <rect x="40" y="84" width="16" height="36" fill={colors.trunk} />
         <polygon points="48,0 92,56 4,56" fill={colors.foliage} />
         <polygon points="48,28 96,92 0,92" fill={colors.foliage} />
@@ -729,16 +879,42 @@ function PlaceholderShape({
   }
   if (shape === 'rock') {
     return (
-      <svg width="88" height="64" viewBox="0 0 88 64" shapeRendering="crispEdges">
+      <svg
+        width={Math.round(44 * scale)}
+        height={Math.round(32 * scale)}
+        viewBox="0 0 88 64"
+        shapeRendering="crispEdges"
+      >
         <polygon points="8,64 0,36 20,8 56,0 88,24 80,64" fill={colors.rock} />
         <polygon points="20,8 56,0 60,24 28,30" fill={colors.grass} opacity="0.35" />
       </svg>
     );
   }
   return (
-    <svg width="96" height="56" viewBox="0 0 96 56" shapeRendering="crispEdges">
+    <svg
+      width={Math.round(48 * scale)}
+      height={Math.round(28 * scale)}
+      viewBox="0 0 96 56"
+      shapeRendering="crispEdges"
+    >
       <ellipse cx="30" cy="36" rx="30" ry="20" fill={colors.foliage} />
       <ellipse cx="62" cy="30" rx="34" ry="26" fill={colors.foliage} />
     </svg>
   );
 }
+
+// ---------------------------------------------------------------------------
+// HUD 효과 슬롯 표시 유틸 (표시 전용. 스탯 계산·효과 적용 로직과 무관)
+// ---------------------------------------------------------------------------
+
+/** 64px 버프 아이콘(ui-buff-*-64)을 51px .buff-visual 상자 안에 맞추는 배율 (64 × 0.75 = 48px) */
+const BUFF_ICON_SCALE = 0.75;
+
+/**
+ * 효과 수치 표시 문자열. 부호는 효과 종류(버프 = 증가, 디버프 = 감소)로 정하고 크기는 절댓값을 쓴다.
+ * 슬롯 value가 +1로 오든 −1로 오든 "AT +1" / "DF -1"처럼 한 가지 규칙으로 보이게 한다("+-1" 방지).
+ */
+function formatEffectValue(isIncrease: boolean, value: number): string {
+  return `${isIncrease ? '+' : '-'}${Math.abs(value)}`;
+}
+

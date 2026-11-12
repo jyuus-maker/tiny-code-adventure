@@ -25,10 +25,12 @@ import {
   drawRegionOrder,
   drawStatRoll,
   getMissionContext,
+  isMissionGoalReached,
   missionReturnCheck,
   setReturnPromptPending,
   type GameState,
 } from './gameState';
+import { computeMissionCardWeights } from './cards';
 import type { RewardOption } from '../logic/rewards/types';
 import type { HeroEffectState } from '../logic/effects/types';
 import type { ItemGrade } from '../render/types';
@@ -79,12 +81,22 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
 
   // ---- 작업 02: 카드 길 ----
 
+  const getCardWeights = (s: GameState) => {
+    const ctx = s.missionId ? getMissionContext(s.missionId) : null;
+    const goalReached = isMissionGoalReached(s);
+    return computeMissionCardWeights(
+      ctx?.mission.kind,
+      ctx?.mission.targetMobId,
+      goalReached,
+    );
+  };
+
   const handleEnterAdventure = () => {
     const cur = state;
     if (cur.phase !== 'adventureReady' || !cur.regionOrder || cur.adventure) return;
     const env = getEnvForParticipation(cur.participationCount, cur.regionOrder);
     if (!env) return;
-    const start = drawAdventureStart(env, rng);
+    const start = drawAdventureStart(env, rng, getCardWeights(cur));
     setState((prev) => applyEnterAdventure(prev, start));
   };
 
@@ -208,6 +220,7 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
           dismissed.regionOrder,
           dismissed.adventure,
           rng,
+          getCardWeights(dismissed),
         );
         return applyAdventureExited(dismissed, plan);
       }
@@ -234,6 +247,7 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
       cur.regionOrder,
       cur.adventure,
       rng,
+      getCardWeights(cur),
     );
     setState((prev) => applyAdventureExited(prev, plan));
   };

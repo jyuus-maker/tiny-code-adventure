@@ -180,7 +180,7 @@
 .reward-title {
   position: absolute;
   left: 214px;
-  top: 123px;
+  top: 103px;
   width: 372px;
   padding: 16px 20px;
   text-align: center;
@@ -268,6 +268,7 @@
   height: 48px;
   flex: none;
   margin-top: auto;
+  margin-bottom: 10px;
   align-self: center;
   background: linear-gradient(140deg, #766073, #373549);
   border: 2px solid #c3a578;
@@ -305,4 +306,8 @@
   line-height: 1.7;
   color: #716255;
   margin-bottom: 16px;
+}
+
+.battle-result-card .gold-btn {
+  transform: translateY(10px);
 }

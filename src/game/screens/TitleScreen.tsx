@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { PixelSprite } from '../../render/PixelSprite';
-import { GAME_FRAME_HEIGHT } from '../frame';
+import { GAME_FRAME_HEIGHT, GAME_FRAME_WIDTH } from '../frame';
 
 const TITLE_BG_ASSET_ID = 'bg-title-adventure-512';
-const TITLE_BG_SOURCE_SIZE = 512;
 
 export type TitleScreenProps = {
   onStart: () => void;
@@ -14,11 +13,13 @@ export function TitleScreen({ onStart }: TitleScreenProps) {
 
   return (
     <section className="screen title-screen" data-scene="title">
-      {/* 1. 배경 아트 (512 원본 배율 맞춤) */}
-      <div className="pix-bg" aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      {/* 1. 배경 아트 (512x512 원본을 800x500으로 강제 전체 화면 맞춤) */}
+      <div className="pix-bg" aria-hidden="true">
         <PixelSprite
           id={TITLE_BG_ASSET_ID}
-          scale={GAME_FRAME_HEIGHT / TITLE_BG_SOURCE_SIZE}
+          width={GAME_FRAME_WIDTH}
+          height={GAME_FRAME_HEIGHT}
+          preserveAspectRatio="none"
         />
       </div>
       <div className="title-haze" aria-hidden="true" />

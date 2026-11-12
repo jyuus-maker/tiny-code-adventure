@@ -1,7 +1,10 @@
 import type { Region } from '../../config';
 import type { TimeOfDay } from '../../data/types';
+import { PixelSprite } from '../../render/PixelSprite';
+import { GAME_FRAME_HEIGHT, GAME_FRAME_WIDTH } from '../frame';
 import type { MissionContext, StatRollResult } from '../gameState';
 
+const TITLE_BG_ASSET_ID = 'bg-title-adventure-512';
 const KIND_LABEL = { battle: '배틀', explore: '탐색' } as const;
 const DIFFICULTY_LABEL = { normal: '노멀', hard: '하드' } as const;
 
@@ -24,8 +27,16 @@ export function AdventureReadyScreen({
 
   return (
     <section className="screen ready-screen" data-scene="ready">
-      <div className="pix-bg" />
-      <div className="darkwash" />
+      {/* 배경 아트 & 딤 (타이틀과 동일한 800x500 배경 + 딤 적용) */}
+      <div className="pix-bg" aria-hidden="true">
+        <PixelSprite
+          id={TITLE_BG_ASSET_ID}
+          width={GAME_FRAME_WIDTH}
+          height={GAME_FRAME_HEIGHT}
+          preserveAspectRatio="none"
+        />
+      </div>
+      <div className="title-haze" aria-hidden="true" />
 
       <div className="gold-panel ready-card">
         <header>ADVENTURE READY</header>
