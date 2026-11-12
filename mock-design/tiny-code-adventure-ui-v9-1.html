@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>코드용사의 모험 — 디자인 통합 UI 목업 v9</title>
+<style>
+:root{--night:#222432;--night2:#151927;--navy:#272736;--gold:#dfb970;--gold2:#a88a60;--text:#f5e8c9;--paper:#f5e9d1;--ink:#3e3031;--muted:#b4a9a6}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#15181e;color:#e8e0d5;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+body{padding:20px 18px 36px;display:flex;align-items:center;flex-direction:column;gap:14px}
+.control-bar{width:min(950px,100%);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.control-copy strong{font-size:13px;color:#f3dfb6;letter-spacing:1px}.control-copy small{display:block;margin-top:4px;font-size:10px;color:#aab0b0}
+.control-groups{display:flex;gap:7px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.control-groups label{display:flex;align-items:center;gap:5px;font-size:10px;color:#abb3ae}
+.control-groups select,.control-groups button{height:30px;border:1px solid #66645e;border-radius:3px;background:#2b2f36;color:#f5e6ca;padding:3px 8px;font:11px inherit;cursor:pointer}
+.control-groups button{font-size:11px}.control-groups button.on{background:#715938;border-color:#e9c884;color:#fff0cd}
+.screen-nav{width:min(950px,100%);display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.screen-nav button{font:11px inherit;font-size:11px;border:1px solid #494b53;background:#20232c;color:#bec4c5;padding:8px 13px;border-radius:3px;cursor:pointer;white-space:nowrap}
+.screen-nav button:hover{border-color:#c39d62;color:#fff1cf}
+.screen-nav button.active{border-color:#d9b579;background:#51402c;color:#ffebbf}
+.stage-clip{width:800px;height:500px;position:relative;flex:none;overflow:hidden;box-shadow:0 0 0 1px #bea479,0 22px 75px #05070add;background:#779d8a}
+#game{position:relative;width:800px;height:500px;overflow:hidden;transform-origin:top left;background:#b2c9ac;isolation:isolate}
+#game:after{content:"";position:absolute;inset:3px;border:1px solid #e0c58f80;z-index:100;pointer-events:none}
+.screen{position:absolute;inset:0;display:none;overflow:hidden}
+.screen.active{display:block}
+.pix-bg{position:absolute;inset:0;background-size:800px 500px;background-position:center;background-repeat:no-repeat;image-rendering:pixelated}
+#game.night .road-screen .pix-bg{filter:brightness(.48) hue-rotate(16deg) saturate(.78)}
+/* shared UI surfaces: gold trimming is via CSS, no UI image assets */
+.gold-panel{background:linear-gradient(150deg,#30303d 0%,#272835 75%,#242432 100%);border:2px solid #c7a264;box-shadow:inset 0 0 0 3px #272835,inset 0 0 0 4px #66573f,0 5px 0 #14161fa8,0 12px 19px #080c1950;color:var(--text);position:relative}
+.gold-panel:before,.gold-panel:after{content:"";position:absolute;width:9px;height:9px;background:#34333d;border:2px solid #dfbc77;transform:rotate(45deg);pointer-events:none;z-index:2}
+.gold-panel:before{top:-6px;left:12px}.gold-panel:after{bottom:-6px;right:12px}
+.gold-label{font-weight:800;color:#e6c88b;font-size:10px;letter-spacing:.45px}
+.gold-rule{height:1px;background:linear-gradient(90deg,#867253,transparent);margin:7px 0}
+.gold-btn,.light-btn{position:relative;min-width:117px;height:40px;padding:0 17px;border:2px solid #936a42;background:linear-gradient(180deg,#f4dfad,#d8b176 60%,#c69b5e);color:#4b352d;box-shadow:0 4px 0 #79603e,0 10px 18px #18141e70;font-family:inherit;font-size:13px;font-weight:850;cursor:pointer}
+.gold-btn:after,.light-btn:after{content:"";position:absolute;inset:3px;border:1px solid #f8ebc399;pointer-events:none}
+.gold-btn:hover,.light-btn:hover{filter:brightness(1.08)}.gold-btn:active,.light-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #79603e}
+.light-btn{background:linear-gradient(#fef8ec,#e8dcc8);border-color:#baa686}
+.keyline{color:#dcba7b}
+/* 1. title variation */
+.title-screen{background:#2c4356}
+.title-screen .pix-bg{filter:brightness(.72) saturate(.89);transform:scale(1.03)}
+.title-screen .title-haze{position:absolute;inset:0;background:linear-gradient(90deg,#121a2ce8 0%,#1b2336d8 42%,#152d3b39 78%,#0f172866),linear-gradient(0deg,#131923d9,transparent 48%)}
+.title-screen .title-crest{position:absolute;left:55px;top:73px;width:70px;height:77px;display:grid;place-items:center;background:#292734e0;border:2px solid #d7b57a;clip-path:polygon(50% 0,92% 23%,92% 77%,50% 100%,8% 77%,8% 23%);color:#f5d993;font-size:31px}
+.title-screen .title-head{position:absolute;left:53px;top:165px;width:480px}
+.title-screen .title-head .eyebrow{font-size:13px;color:#f7dca0;letter-spacing:6px;font-weight:850}
+.title-screen h1{margin:14px 0 3px;font-size:55px;line-height:1.12;letter-spacing:-3.6px;color:#fff0ce;font-weight:950;text-shadow:0 4px 0 #443b3d,0 7px 19px #0009;white-space:nowrap}
+.title-screen .title-head p{font-size:13px;color:#dcceb6;margin:18px 0 0;letter-spacing:1.2px}
+.title-screen .title-actions{position:absolute;left:53px;bottom:66px;display:flex;gap:13px}
+.title-screen .title-actions button{width:172px;height:48px;font-size:16px}
+.title-screen .title-foot{position:absolute;bottom:23px;left:54px;font:10px Consolas,monospace;letter-spacing:2px;color:#d5c29aa8}
+.title-screen .title-rail{position:absolute;right:48px;top:72px;width:203px;height:330px;perspective:650px;pointer-events:none}
+.title-rail .title-card{position:absolute;left:50%;width:129px;height:177px;border:5px solid #453d47;box-shadow:0 0 0 2px #d9b579,0 16px 25px #0c1122c0;background:linear-gradient(135deg,#eee0bc,#f9edd5);transform-style:preserve-3d}
+.title-rail .title-card:before{content:"";position:absolute;inset:8px;border:1px solid #bf9d6a}
+.title-rail .title-card:after{content:"◆";position:absolute;top:50px;left:0;right:0;text-align:center;font-size:56px;color:#8e719b;text-shadow:2px 3px #e9c791,-2px -1px #5b4b76}
+.title-rail .title-card.one{top:14px;transform:translateX(-43%) rotateY(-19deg) rotateZ(9deg) scale(.78);opacity:.85}
+.title-rail .title-card.two{top:79px;transform:translateX(-22%) rotateY(-18deg) rotateZ(-4deg) scale(.91);opacity:.93}
+.title-rail .title-card.three{top:155px;transform:translateX(-49%) rotateY(-8deg) rotateZ(4deg);z-index:2}
+.title-screen .top-line{position:absolute;top:18px;left:24px;right:24px;display:flex;justify-content:space-between;font-size:9px;color:#efce91;letter-spacing:2px}
+/* 2. stat roll */
+.prep-screen .pix-bg{filter:brightness(.62) saturate(.7)}
+.prep-screen .darkwash{position:absolute;inset:0;background:#10172285}
+.prep-wrap{position:absolute;left:90px;right:90px;top:43px;bottom:43px;padding:29px 36px;text-align:center}
+.prep-heading{font-size:12px;letter-spacing:4px;color:#d5ba85;font-weight:900}
+.prep-title{font-size:29px;font-weight:900;margin:8px 0 5px;color:#f5e7c9}
+.prep-sub{font-size:11px;color:#beafb0;margin:0}
+.stat-cards{display:flex;gap:11px;justify-content:center;margin-top:26px}
+.roll-card{flex:1;height:154px;border:1px solid #bda078;background:#212432;box-shadow:inset 0 0 0 4px #2b2c3b;padding:20px 8px 13px;text-align:center}
+.roll-card .ic{font-size:26px;color:#d8b778}.roll-card .statnum{font-size:48px;font-weight:900;color:#fff0cb;line-height:1.25}.roll-card .statname{font-size:12px;color:#cbb48e;font-weight:800}
+.roll-foot{display:flex;justify-content:center;align-items:center;gap:17px;margin-top:24px}
+.roll-foot .total{font-size:12px;color:#d3bc93}.roll-foot .total strong{color:#ffdc8b;font-size:22px}
+/* 3. mission: title screen beneath dim, but no distractingly visible title wording */
+.mission-screen .pix-bg{filter:brightness(.92) saturate(.88)}
+.mission-screen .mission-backdrop{position:absolute;inset:0;background:linear-gradient(115deg,#0d182344,#1a2a3338),linear-gradient(0deg,#0c182141,transparent 100%)}
+.mission-screen .dim{position:absolute;inset:0;background:#16192578}
+.mission-modal{position:absolute;left:84px;top:48px;width:632px;height:400px;padding:21px 26px 19px;background:linear-gradient(145deg,#f9edda,#e9dbc2);color:#413537;border:5px solid #383440;outline:2px solid #d5b57a;outline-offset:-11px;box-shadow:0 11px 0 #080d18a1,0 28px 43px #090c14a1}
+.mission-modal:before,.mission-modal:after{content:"";position:absolute;top:15px;width:10px;height:10px;background:#413c49;border:2px solid #c59e63;transform:rotate(45deg)}.mission-modal:before{left:18px}.mission-modal:after{right:18px}
+.mission-modal .mh{height:41px;border-bottom:1px solid #c8b39b;display:flex;align-items:flex-start;justify-content:space-between;padding:0 9px;color:#897558;font-size:11px}
+.mission-modal .mh b{font-size:17px;color:#45363b}
+.mission-content{display:flex;gap:20px;margin:21px 9px 0}
+.client-art{flex:0 0 154px;height:238px;background:#b1c8b5;border:3px solid #b39a79;display:flex;flex-direction:column;align-items:center;overflow:hidden;box-shadow:inset 0 0 0 3px #eee2c5}
+.client-art svg{width:148px;height:203px;flex:1;image-rendering:pixelated}.client-art span{background:#373340;color:#e9d5a8;width:100%;text-align:center;font-size:11px;font-weight:800;padding:8px}
+.mission-info{flex:1;min-width:0}
+.mission-info .mini{font-size:10px;color:#a48357;letter-spacing:1px}
+.mission-info h2{font-size:22px;letter-spacing:-1px;margin:9px 0 10px;line-height:1.25}
+.mission-info .speaker{font-size:12px;font-weight:900;color:#926c47;margin:0 0 5px}
+.mission-info blockquote{font-size:11px;line-height:1.82;color:#66564e;margin:0;word-break:keep-all}
+.objective{margin-top:13px;padding:10px 11px;background:#dfcfb1b0;border-left:4px solid #c09a5f;display:flex;align-items:center;gap:10px}
+.objective .objective-ic{font-size:25px;color:#8c6b43}.objective small{display:block;color:#826e5b;font-size:9px}.objective b{font-size:14px;color:#453934}.objective b em{color:#a67944;font-style:normal}
+.mission-bottom{position:absolute;bottom:23px;left:36px;right:36px;display:flex;align-items:center;justify-content:space-between}
+.mission-bottom span{font-size:10px;color:#947f69}
+/* 4. ready */
+.ready-screen .pix-bg{filter:brightness(.55) saturate(.73)}.ready-screen .darkwash{position:absolute;inset:0;background:#141b277e}
+.ready-card{position:absolute;left:110px;top:44px;width:580px;height:412px;padding:25px 30px}
+.ready-card header{text-align:center;font-size:12px;letter-spacing:3px;color:#ddbf85}
+.ready-card h2{font-size:29px;text-align:center;margin:8px 0 23px;color:#f1e4c9}
+.ready-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.ready-grid section{min-height:179px;padding:18px;background:#1b1f2bbc;border-top:2px solid #a58659}
+.ready-grid h3{font-size:12px;color:#d3b787;margin:0 0 17px}.ready-grid p{font-size:12px;line-height:2;color:#e9dcc4;margin:0}
+.ready-grid b{color:#f7d991}.ready-card .ready-btn{display:flex;justify-content:center}
+/* 5. gameplay scene and fixed HUD groups */
+.road-screen .pix-bg{z-index:0}
+.road-screen .road-shade{position:absolute;inset:0;z-index:1;background:linear-gradient(0deg,#25332920,transparent 40%);pointer-events:none}
+.road-queue{position:absolute;inset:0;z-index:2;pointer-events:none}
+.queue-card{position:absolute;left:50%;background:#f9efdb;border:4px solid #4c3e46;box-shadow:0 0 0 2px #c6a36b,0 9px 18px #111a2569,inset 0 0 0 2px #bd9b6f;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;color:#54433d;transition:transform .35s,opacity .25s}
+.queue-card:before{content:"";position:absolute;inset:7px;border:1px solid #ccb68e;pointer-events:none}
+.queue-card small{position:relative;margin-top:7px;font-size:9px;letter-spacing:3px;color:#aa885c;font-weight:850}
+.queue-card .glyph{position:relative;font-size:33px;color:#a79b77}
+.queue-card.near3{width:60px;height:68px;top:113px;margin-left:-30px;z-index:2;transform:scale(.69);filter:saturate(.7)}
+.queue-card.near2{width:76px;height:89px;top:143px;margin-left:-38px;z-index:3;transform:scale(.81)}
+.queue-card.near1{width:97px;height:115px;top:177px;margin-left:-48px;z-index:4;transform:scale(.91)}
+.queue-card.current{width:200px;height:235px;left:300px;top:248px;z-index:5;transition:transform .65s ease-out,opacity .25s}
+.queue-card.current .card-pic{width:164px;height:135px;background:#b3ca99;border:2px solid #c8aa81;margin:12px 0 2px;position:relative;overflow:hidden}
+.queue-card.current .card-pic svg{width:100%;height:100%}
+.queue-card.current .card-label{font-size:16px;z-index:1;font-weight:900;margin-top:5px}.queue-card.current .tiny-bottom{z-index:1;font-size:9px;color:#9d896e;margin-top:8px}
+.queue-card.current.growing{transform:translateY(27px) scale(.84)}
+.queue-card.current.leaving{transform:translateX(120px) rotate(12deg) scale(.57);opacity:0}
+/* top-left hero HUD: 190px width x 143px tall; same height for right-side region */
+.hero-group{position:absolute;left:18px;top:17px;width:190px;height:144px;z-index:27;display:flex;flex-direction:column;padding:11px 11px 9px}
+.hero-brand{display:flex;gap:9px;align-items:center;height:52px}
+.hero-logo{width:43px;height:43px;flex:none;display:grid;place-items:center;color:#f1c879;font-size:20px;background:#3a3341;border:2px solid #d4a660;clip-path:polygon(50% 0,95% 23%,95% 77%,50% 100%,5% 77%,5% 23%)}
+.hero-brand .tiny-brand{color:#d7b372;font-size:9px;letter-spacing:1.2px;font-weight:800}
+.hero-brand .game-name{color:#fff1cd;white-space:nowrap;font-size:16px;font-weight:950;letter-spacing:-1.1px;line-height:1.4;text-shadow:0 1px #5f5140}
+.hero-divider{height:1px;margin:3px 0 8px;background:linear-gradient(90deg,#b39564,#5f555a)}
+.hp-row{height:24px;display:flex;align-items:center;gap:5px;background:#1a1f2a;border:1px solid #63596a;padding:2px 5px}
+.hp-row .hp-label{font-weight:900;color:#f0d597;font-size:15px}
+.hp-track{height:15px;flex:1;background:#11151f;border:1px solid #a58582;position:relative;overflow:hidden}
+.hp-track .fill{height:100%;width:82%;background:repeating-linear-gradient(90deg,#e16b72 0 14px,#c85465 14px 16px);box-shadow:inset 0 3px 2px #ffc6c655;transition:width .25s}
+.hp-track .hp-num{position:absolute;inset:0;display:grid;place-items:center;font-size:10px;color:#fff4dc;font-weight:800;text-shadow:0 1px 3px #000,0 0 2px #000}
+.hero-stats{margin-top:7px;height:23px;display:flex;align-items:center;color:#d3c4b4;font-size:11px;gap:0;padding:0 2px}
+.hero-stats .stat-field{flex:1;display:flex;align-items:center;gap:4px;min-width:0}.hero-stats .stat-field b{margin-left:auto;text-align:right;color:#f2d68f;font-size:13px;font-variant-numeric:tabular-nums}.hero-stats .miniicon{color:#efce8d;flex:none}.hero-stats .sep{height:17px;width:1px;flex:none;background:#786957;margin:0 9px}
+/* central progression bar precisely symmetrical: 18+190+22 -> x230; right x592 => 22 gap */
+.progress-group{position:absolute;left:230px;top:17px;width:340px;height:69px;z-index:26;color:#f4e0bb}
+.progress-top{height:40px;display:flex;align-items:center;background:linear-gradient(#30313f,#212430);border:1px solid #a88d65;box-shadow:0 4px 0 #141b2691}
+.progress-top .progress-title{font-size:10px;font-weight:800;line-height:1.4;margin-left:12px;white-space:nowrap;color:#e4c88e}
+.progress-top .timer{font-size:27px;letter-spacing:.5px;line-height:1;color:#f5d68e;font-weight:900;margin:0 auto;text-shadow:0 2px 4px #e3b56822;font-variant-numeric:tabular-nums}
+.progress-top .count{display:flex;align-items:baseline;gap:3px;margin-right:12px;white-space:nowrap}
+.progress-top .count span{font-size:9px;color:#b5adb0}.progress-top .count strong{font-size:23px;color:#f5d48a}.progress-top .count small{font-size:10px;color:#b4a6a6}
+.pipbar{display:flex;height:18px;gap:2px;padding:4px 5px;margin-top:3px;background:#262733cc;box-shadow:0 4px 0 #12182170;border:1px solid #977f62}
+.pipbar i{flex:1;display:block;height:8px;transform:skewX(-13deg);background:#57596a;border:1px solid #383849}.pipbar i.on{background:linear-gradient(#f2dfa9,#bda173);border-color:#c9a875}
+/* right region panel: exactly same height as hero cluster */
+.region-group{position:absolute;right:18px;top:17px;width:190px;height:144px;z-index:27;padding:15px 13px}
+.region-group .where{font-size:11px;font-weight:800;color:#dbbc86}.region-group .where span{color:#f5d58e;font-size:14px}
+.region-group .region-name{font-size:24px;letter-spacing:-1.6px;color:#fce4ad;margin-top:25px;font-weight:900}
+.region-group .sunmoon{position:absolute;right:12px;top:65px;font-size:25px;color:#f5cf77}
+.region-group .region-tail{font-size:10px;color:#b5aab0;border-top:1px solid #72616a;padding-top:10px;margin-top:8px}
+/* bottom two buff slots 90x90, gap 10 => width 190 */
+.buff-group{position:absolute;left:18px;bottom:17px;width:190px;height:90px;display:flex;gap:10px;z-index:34}
+.buff-slot{height:90px;width:90px;position:relative;border:2px solid #b89a6c;background:linear-gradient(145deg,#413747,#252534 80%);box-shadow:inset 0 0 0 3px #292b3a,inset 0 0 0 4px #756450,0 7px 0 #15192588;cursor:help;color:#ffebc8}
+.buff-slot:focus{outline:2px solid #f1d29b;outline-offset:2px}
+.buff-slot .buff-top{position:absolute;left:2px;top:4px;right:2px;font-size:16.5px;line-height:1.05;font-weight:900;text-align:center;letter-spacing:-.7px;text-shadow:0 1px 4px #000,0 2px 3px #000;z-index:2;pointer-events:none}
+.buff-slot .buff-bottom{position:absolute;left:3px;right:3px;bottom:3px;font-size:18px;line-height:1.02;text-align:center;letter-spacing:-.8px;color:#f7d57e;font-weight:900;text-shadow:0 1px 4px #000,0 2px 4px #000;z-index:2;pointer-events:none}
+.buff-visual{position:absolute;left:50%;top:50%;width:51px;height:51px;transform:translate(-50%,-50%);display:grid;place-items:center;z-index:0}
+.spark{width:44px;height:44px;clip-path:polygon(50% 0,60% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);background:radial-gradient(circle at 50% 45%,#ffe7b7 0%,#ff9584 22%,#ea445c 64%,#7e283e 100%);filter:drop-shadow(0 0 6px #eb3c5d)}
+.shield{width:40px;height:47px;clip-path:polygon(50% 0,92% 14%,85% 70%,50% 100%,15% 70%,8% 14%);background:linear-gradient(130deg,#e8fbff,#86d0ff 36%,#437bce 78%,#293c8d);box-shadow:inset 0 0 0 2px #c9eaff;filter:drop-shadow(0 0 7px #66bdf6)}
+.leaf{width:45px;height:35px;border-radius:95% 5% 88% 10% / 95% 9% 80% 10%;background:linear-gradient(135deg,#d1ff8e,#7ed951 40%,#2d9f50 80%,#197e49);transform:rotate(-34deg);box-shadow:inset -3px -3px 0 #3a9e49,0 0 15px #7edc5a44;position:relative}
+.leaf:before{content:"";position:absolute;left:8px;top:20px;transform:rotate(-16deg);width:34px;height:3px;background:#dcffaf}
+.buff-slot.empty .buff-visual{border:1px dashed #6b6471;width:60px;height:60px}.buff-slot.empty .buff-visual:after{content:"+";font-size:40px;color:#736e7b;font-weight:400}
+.ui-tooltip{position:absolute;display:block;visibility:hidden;opacity:0;transition:opacity .1s;bottom:calc(100% + 9px);left:0;width:192px;z-index:80;padding:12px;background:#252735;border-left:3px solid #d9b777;box-shadow:0 9px 26px #050812c9;color:#ede0c7;pointer-events:none}
+.ui-tooltip strong{font-size:11px;color:#ffdda4}.ui-tooltip p{font-size:10px;line-height:1.7;color:#c6bbb5;margin:6px 0 0}
+.buff-slot:hover .ui-tooltip,.buff-slot:focus .ui-tooltip,.quest-panel:hover .ui-tooltip,.quest-panel:focus .ui-tooltip{visibility:visible;opacity:1}
+.quest-panel{position:absolute;right:18px;bottom:17px;width:190px;height:90px;z-index:34;padding:12px 12px;cursor:help;display:flex;align-items:center;gap:9px}
+.quest-panel .gem{width:43px;height:48px;flex:none;background:linear-gradient(140deg,#766073,#373549);border:2px solid #c3a578;display:grid;place-items:center;box-shadow:inset 0 0 0 3px #494054}
+.quest-panel .gem span{display:block;width:24px;height:24px;transform:rotate(45deg);background:linear-gradient(135deg,#fae2aa,#dcaeca 65%,#9487ba);border:3px solid #f8d6a0;box-shadow:inset 0 0 0 1px #fff2d8}
+.quest-panel .quest-name{flex:1;min-width:0}.quest-panel .quest-name b{display:block;font-size:11px;color:#ffe4b6;white-space:nowrap}.quest-panel .quest-name small{display:block;font-size:9px;line-height:1.6;color:#b5a8ab;margin-top:3px}
+.quest-panel .quest-progress{margin-left:auto;color:#f5d58d;font-size:18px;font-weight:900;white-space:nowrap}
+.quest-panel .ui-tooltip{left:auto;right:0;width:190px;bottom:calc(100% + 10px)}
+/* route labels only in mock inspect mode */
+.play-caption{position:absolute;left:50%;transform:translateX(-50%);bottom:11px;z-index:8;color:#f6edcf;background:#27362d88;padding:5px 11px;font-size:9px;letter-spacing:.5px}
+/* shared floating overlays: no full outer frame, center stage while leaving HUD accessible */
+.event-floats,.battle-floats,.reward-floats,.return-floats{position:absolute;inset:0;z-index:18;pointer-events:none}
+.event-floats>.float,.battle-floats>.float,.reward-floats>.float,.return-floats>.float{pointer-events:auto}
+.soft-dim{position:absolute;inset:0;z-index:14;pointer-events:none;opacity:0;background:radial-gradient(ellipse 320px 220px at 50% 55%,#1419235c 0%,#11192763 50%,transparent 90%);transition:opacity .2s}
+#game.dim .soft-dim{opacity:1}
+.float{position:absolute;box-shadow:0 15px 26px #10121863,0 0 25px 16px #11161e27,0 0 56px 32px #14192224}
+.event-info{left:214px;top:104px;width:372px;height:137px;background:linear-gradient(130deg,#fff3dd,#eee0c4);color:#3f3233;padding:15px 106px 10px 16px;border:1px solid #b49b76}
+.event-info .kicker{font-size:9px;color:#997451;letter-spacing:1px;font-weight:900;white-space:nowrap}
+.event-info h2{font-size:22px;margin:8px 0 8px;letter-spacing:-1px;white-space:nowrap}
+.event-info p{font-size:11px;line-height:1.7;color:#77645c;white-space:nowrap;margin:0}
+.event-info .art{position:absolute;right:9px;top:9px;width:89px;height:115px;display:grid;place-items:center;overflow:hidden;background:#b5c99b}
+.event-info .art svg{width:100%;height:100%;image-rendering:pixelated}
+.code-panel{left:214px;top:241px;width:372px;height:167px;border:1px solid #aa885b;border-left:5px solid #d8b576;background:#252633;color:#f0e4d1;overflow:auto;white-space:pre;padding:14px 14px;font-family:'D2Coding','Google Sans Code','JetBrains Mono','Source Code Pro',Consolas,'Courier New',monospace;font-weight:400;font-size:12px;line-height:1.62;text-align:left;letter-spacing:0}
+.code-panel *{font-family:inherit;font-weight:400}.code-panel .kw{color:#efc384}.code-panel .num{color:#b9cfad}.code-panel .fn{color:#d1c2ea}
+.action-float{position:absolute;top:417px;left:243px;width:314px;z-index:5;display:flex;gap:12px;justify-content:center;pointer-events:auto}
+.action-float .gold-btn,.action-float .light-btn{width:151px;height:42px}
+.evt-result{position:absolute;top:210px;left:253px;width:294px;text-align:center;padding:12px 9px;background:#efe2c7;color:#67513f;border:1px solid #b3956f;font-size:12px;font-weight:800;display:none;z-index:23}
+.evt-result.show{display:block}
+/* battle UI */
+.battle-head{position:absolute;left:214px;top:104px;width:372px;height:147px;padding:11px 13px 0;background:linear-gradient(125deg,#f5ebd4,#decbb1);border:1px solid #ad9072;color:#413638;display:flex;flex-direction:column;gap:0}.battle-main{display:flex;align-items:flex-start;gap:12px;height:106px;flex:none}
+.battle-head .battle-art{width:95px;height:91px;background:#bbd1a3;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden}
+.battle-head .battle-art .mob-shape{height:70px;width:74px;border-radius:34% 43% 32% 35%;border:8px solid #486747;background:linear-gradient(150deg,#8eb970,#6d9a57);box-shadow:inset 8px 8px #c1d69d;transform:rotate(4deg)}
+.battle-head .battle-data{flex:1;min-width:0}.battle-head .battle-data small{color:#8d715c;font-size:10px;font-weight:800}.battle-head .battle-data h2{margin:7px 0 11px;font-size:20px}
+.enemy-hp{height:11px;background:#5c4854;border:1px solid #a7858a;position:relative}
+.enemy-hp .fill{height:100%;width:69%;background:linear-gradient(#e17d7d,#b94d64)}
+.enemy-hp-num{font:10px Consolas,monospace;margin-top:5px;color:#6e5455}
+.battle-status{height:29px;flex:none;border-top:1px solid #c2ab90;background:transparent;color:#634b42;font-size:11px;display:flex;align-items:center;justify-content:space-between;padding:0 1px;gap:5px;white-space:nowrap}.battle-status b{font-weight:900}
+.battle-code{left:214px;top:251px;width:372px;height:158px}
+.battle-actions{position:absolute;left:214px;top:417px;width:372px;z-index:5;display:flex;gap:8px;pointer-events:auto}
+.battle-actions button{flex:1;min-width:0;padding:0 4px;height:40px}
+/* rewards and end */
+.reward-title{left:214px;top:123px;width:372px;padding:18px 20px;text-align:center;background:linear-gradient(#f8edd9,#ead7b9);color:#45393b;border:1px solid #bf9f72}
+.reward-title .trophy{font-size:28px;color:#b4894f}.reward-title h2{font-size:23px;margin:5px 0}.reward-title p{font-size:10px;line-height:1.7;color:#7b6355;margin:8px 0 0}
+.reward-choices{position:absolute;top:288px;left:214px;width:372px;display:flex;gap:8px;pointer-events:auto}
+.reward-choices button{flex:1;min-width:0;height:125px;text-align:left;padding:14px;background:linear-gradient(#32313e,#222530);border:2px solid #b69a6f;color:#f0d8af;font:inherit;cursor:pointer;box-shadow:0 10px 18px #0e111a9c}
+.reward-choices button:hover{border-color:#ffe0a1;transform:translateY(-3px)}
+.reward-choices .tag{display:block;font-size:9px;color:#d0b27b;margin-bottom:8px}.reward-choices b{display:block;font-size:15px}.reward-choices small{display:block;font-size:10px;color:#c9bdba;margin-top:8px}
+.return-card{position:absolute;top:143px;left:219px;width:362px;background:linear-gradient(#fbefdb,#e9d5b7);box-shadow:0 19px 33px #10151bc9;padding:24px 22px;border:2px solid #c1a177;text-align:center;color:#453739;pointer-events:auto}
+.return-card .gem-text{font-size:30px;color:#ba925e}.return-card h2{margin:7px 0 10px;font-size:22px}.return-card p{font-size:12px;color:#716255;line-height:1.7;margin:0 0 20px}.return-actions{display:flex;justify-content:center;gap:9px}.return-actions button{width:151px;padding:0 7px}
+.end-screen .pix-bg{filter:brightness(.4) saturate(.7)}.end-screen .end-wash{position:absolute;inset:0;background:linear-gradient(150deg,#15192db8,#28313e91)}
+.end-sheet{position:absolute;left:125px;top:32px;width:550px;height:437px;padding:25px 30px;text-align:center}
+.end-sheet .end-mini{letter-spacing:4px;color:#d1b580;font-size:11px;font-weight:850}
+.end-sheet h2{font-size:30px;margin:9px 0 2px;color:#f8e7c4}.end-sheet .status-line{font-size:11px;color:#bfb4b4;margin:0 0 24px}
+.end-score{font:900 48px system-ui;color:#f4d28d;line-height:1}.end-score-label{font-size:10px;color:#bdacb1;letter-spacing:2px;margin-bottom:6px}
+.end-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:24px 0 22px;text-align:left}.end-stats div{background:#1b1e29;padding:12px 10px}.end-stats small{display:block;font-size:10px;color:#ac9d9a}.end-stats b{display:block;margin-top:6px;font-size:19px;color:#e6ca91}
+.help-layer{position:absolute;inset:0;display:none;background:#111522b5;z-index:65;place-items:center}.help-layer.show{display:grid}
+.help-panel{width:540px;padding:24px 30px}.help-panel h2{font-size:23px;margin:0 0 16px}.help-panel p{font-size:12px;line-height:2.1;color:#d7c5b3}
+.demo-caption{width:min(950px,100%);font-size:11px;color:#acb0aa;line-height:1.6;margin:0}
+@media(max-width:970px){body{align-items:flex-start}.control-bar,.screen-nav,.demo-caption{width:100%}}
+/* v9: force same visual grid for all play overlays; preserve interactive left and right HUDs */
+.event-floats .event-info,.battle-floats .battle-head{z-index:1}
+.event-floats .code-panel,.battle-floats .battle-code{z-index:2}
+.code-panel{font-weight:400;margin:0;scrollbar-width:thin;scrollbar-color:#85745e #242431}
+</style>
+</head>
+<body>
+<div class="control-bar">
+  <div class="control-copy"><strong>TINY CODE ADVENTURE　/　UI DESIGN v9.1</strong><small>완성형 HTML · 800 × 500 · 외부 UI 이미지·라이브러리 없음 · 화면 검토용</small></div>
+  <div class="control-groups">
+    <label>지역 <select id="regionSelect"><option value="warm">온화</option><option value="desert">사막</option><option value="cold">설원</option></select></label>
+    <button id="nightBtn" type="button">밤 보기</button>
+    <label>버프 <select id="buffSelect"><option value="attack">공격 + 피</option><option value="defense">방어 + 피</option><option value="empty">빈 슬롯</option></select></label>
+    <button id="dimBtn" type="button">그라데이션 딤 비교</button>
+    <button id="autoBtn" type="button">자동 카드 연출</button>
+  </div>
+</div>
+<nav class="screen-nav" aria-label="UI 화면 테스트 메뉴">
+  <button type="button" data-nav="title" class="active">01 타이틀</button>
+  <button type="button" data-nav="stat">02 스탯 굴림</button>
+  <button type="button" data-nav="mission">03 미션</button>
+  <button type="button" data-nav="ready">04 출발 준비</button>
+  <button type="button" data-nav="play">05 모험 플레이</button>
+  <button type="button" data-nav="event">06 이벤트 모달</button>
+  <button type="button" data-nav="battle">07 전투</button>
+  <button type="button" data-nav="reward">08 전투 보상</button>
+  <button type="button" data-nav="return">09 귀가 선택</button>
+  <button type="button" data-nav="end">10 결과</button>
+</nav>
+<div class="stage-clip" id="clip">
+  <div id="game">
+    <!-- all screens share CSS/embedded game-scene backgrounds; UI is HTML/CSS -->
+    <section class="screen title-screen active" data-scene="title">
+      <div class="pix-bg"></div><div class="title-haze"></div>
+      <div class="top-line"><span>TINY ARCADE · ORIGINAL GAME</span><span>JAVA / JAVASCRIPT / TYPESCRIPT</span></div>
+      <div class="title-crest" aria-hidden="true">〈/〉</div>
+      <div class="title-head"><div class="eyebrow">TINY ARCADE PRESENTS</div><h1>코드용사의 모험</h1><p>서른 장의 카드 · 세 언어의 땅 · 하나의 의뢰</p></div>
+      <div class="title-rail" aria-hidden="true"><div class="title-card one"></div><div class="title-card two"></div><div class="title-card three"></div></div>
+      <div class="title-actions"><button class="gold-btn" type="button" data-go="stat">모험 시작　◆</button><button class="light-btn" id="helpBtn" type="button">도움말</button></div>
+      <div class="title-foot">CODE ADVENTURER　•　WEB MINI GAME</div>
+    </section>
+    <section class="screen prep-screen" data-scene="stat">
+      <div class="pix-bg"></div><div class="darkwash"></div>
+      <div class="gold-panel prep-wrap"><div class="prep-heading">CREATE YOUR HERO</div><div class="prep-title">용사의 스탯을 정해주세요</div><p class="prep-sub">HP · 공격 · 방어, 합계 30포인트 · 각 항목 최소 5</p>
+        <div class="stat-cards"><div class="roll-card"><div class="ic">♥</div><div class="statnum" id="rollHp">10</div><div class="statname">HP 포인트</div></div><div class="roll-card"><div class="ic">⚔</div><div class="statnum" id="rollAtk">12</div><div class="statname">공격</div></div><div class="roll-card"><div class="ic">⬡</div><div class="statnum" id="rollDef">8</div><div class="statname">방어</div></div></div>
+        <div class="roll-foot"><div class="total">총합 <strong>30</strong></div><button class="light-btn" id="rerollBtn" type="button">다시 굴리기 ↻</button><button class="gold-btn" type="button" data-go="mission">이 스탯으로 결정</button></div>
+      </div>
+    </section>
+    <section class="screen mission-screen" data-scene="mission">
+      <div class="pix-bg"></div><div class="mission-backdrop"></div><div class="dim"></div>
+      <div class="mission-modal"><div class="mh"><b>◆　오늘의 의뢰</b><span>배틀 의뢰　/　노멀</span></div>
+        <div class="mission-content"><div class="client-art"><svg viewBox="0 0 144 180" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="144" height="180" fill="#b9cdb7"/><path d="M0 112H144V180H0Z" fill="#8baca0"/><path d="M0 140H144V180H0Z" fill="#829b83"/><path d="M35 180V118H46V103H95V114H109V180Z" fill="#473e4b"/><path d="M47 180V122H60V143H84V123H98V180Z" fill="#674b44"/><path d="M59 123H84V150H59Z" fill="#d5ac77"/><path d="M55 140H90V180H55Z" fill="#7e6351"/><path d="M61 147H84V175H61Z" fill="#9d8267"/><path d="M50 81H96V111H86V124H60V112H50Z" fill="#d3ab87"/><path d="M47 64H99V81H104V97H94V82H53V96H42V80H47Z" fill="#4c4541"/><path d="M52 49H95V60H104V74H42V61H52Z" fill="#56535b"/><path d="M59 35H87V48H98V57H47V48H59Z" fill="#353a44"/><path d="M54 80H63V85H54ZM82 80H91V85H82Z" fill="#3b3333"/><path d="M66 99H81V105H66Z" fill="#855a4b"/><path d="M50 117H61V156H51Z" fill="#ae8c68"/><path d="M88 117H99V157H88Z" fill="#ae8c68"/><path d="M99 138H114V146H104V172H96V153H99Z" fill="#d2b28c"/><path d="M112 143H122V174H112Z" fill="#6e7377"/><path d="M104 143H130V154H104Z" fill="#d0d0c0"/><path d="M107 138H127V145H107Z" fill="#969b9d"/><path d="M44 137H32V160H42V167H48V138Z" fill="#ccaa81"/><path d="M31 157H48V165H31Z" fill="#d6b58b"/><rect x="10" y="154" width="16" height="20" fill="#4d5b60"/></svg><span>대장장이</span></div>
+          <div class="mission-info"><div class="mini">THE REQUEST · VILLAGE QUEST</div><h2>거북 등껍질을 구해 주세요.</h2><p class="speaker">대장장이</p>
+            <blockquote>쇠가 똑 떨어졌는데 방패 주문이 밀려 있어. 거북 등껍질이 쇠만큼 단단하다더군. 두 개면 급한 불은 끌 수 있어.</blockquote>
+            <div class="objective"><span class="objective-ic">◈</span><div><small>의뢰 목표</small><b>거북 등껍질 <em>× 2</em></b></div></div>
+          </div>
+        </div><div class="mission-bottom"><span>의뢰를 확인하고 출발해 주세요.</span><button class="gold-btn" type="button" data-go="ready">의뢰 수락　◆</button></div>
+      </div>
+    </section>
+    <section class="screen ready-screen" data-scene="ready">
+      <div class="pix-bg"></div><div class="darkwash"></div><div class="gold-panel ready-card"><header>ADVENTURE READY</header><h2>모험을 시작합니다</h2>
+        <div class="ready-grid"><section><h3>◆　용사 상태</h3><p>HP <b id="readyHp">1000 / 1000</b><br>공격 <b id="readyAtk">12</b>　 /　방어 <b id="readyDef">8</b><br>스탯 배분 완료</p></section><section><h3>◆　진행 중인 의뢰</h3><p>의뢰인　<b>대장장이</b><br>목표　<b>거북 등껍질 × 2</b><br>유형　<b>배틀 · 노멀</b></p></section></div>
+        <div class="ready-btn"><button class="gold-btn" type="button" data-go="play">카드 길로 출발　◆</button></div>
+      </div>
+    </section>
+    <!-- The road game is a common base for all five play states -->
+    <section class="screen road-screen" data-scene="road">
+      <div class="pix-bg"></div><div class="road-shade"></div>
+      <div class="road-queue" id="roadQueue">
+        <div class="queue-card near3"><small>◆</small><div class="glyph">◇</div></div>
+        <div class="queue-card near2"><small>◆</small><div class="glyph">◇</div></div>
+        <div class="queue-card near1"><small>◆</small><div class="glyph">◇</div></div>
+        <div class="queue-card current" id="frontCard"><small>◆　A D V E N T U R E　◆</small><div class="card-pic"><svg viewBox="0 0 120 120" shape-rendering="crispEdges" aria-hidden="true"><rect width="120" height="120" fill="#aec99a"/><rect x="55" y="62" width="17" height="45" fill="#805b40"/><path d="M34 54V43H44V30H55V20H75V31H88V43H97V56H105V70H96V83H83V92H43V80H28V67H20V54Z" fill="#436f4c"/><path d="M39 51V39H51V29H73V39H84V50H94V65H85V77H76V82H47V73H33V62H28V51Z" fill="#75a15f"/><path d="M47 47V37H59V29H72V40H80V51H88V63H80V71H48V60H39V48Z" fill="#93b77b"/><path d="M13 102H29V108H13ZM89 99H107V108H89Z" fill="#6f9b5c"/></svg></div><span class="card-label">나무 아래 휴식</span><span class="tiny-bottom">카드 진행 예시</span></div>
+      </div>
+      <div class="soft-dim"></div>
+      <div class="hero-group gold-panel"><div class="hero-brand"><div class="hero-logo">〈/〉</div><div><div class="tiny-brand">TINY ARCADE</div><div class="game-name">코드용사의 모험</div></div></div><div class="hero-divider"></div>
+        <div class="hp-row"><div class="hp-label">HP</div><div class="hp-track"><div class="fill" id="heroHpFill"></div><div class="hp-num" id="heroHpNum">820 / 1000</div></div></div>
+        <div class="hero-stats"><span class="stat-field"><span class="miniicon">⚔</span><span>공격</span><b id="heroAtkNum">12</b></span><span class="sep"></span><span class="stat-field"><span class="miniicon">⬡</span><span>방어</span><b id="heroDefNum">9</b></span></div>
+      </div>
+      <div class="progress-group"><div class="progress-top"><div class="progress-title">◆ 모험 진행<br>남은 시간</div><div class="timer">09:48</div><div class="count"><span>참여</span><strong id="progressCount">08</strong><small>/30</small></div></div><div class="pipbar" id="pipbar"></div></div>
+      <div class="region-group gold-panel"><div class="where"><span>◆</span> 모험 지역</div><div class="region-name" id="regionName">온화의 땅</div><div class="sunmoon" id="sunmoon">☀</div><div class="region-tail" id="regionSub">TypeScript · 1일차 · 낮</div></div>
+      <div class="buff-group" aria-label="효과 슬롯 2개">
+        <div class="buff-slot" tabindex="0" id="combatBuff"><span class="buff-top" id="combatBuffName">AT +2</span><div class="buff-visual" id="combatBuffIcon"><div class="spark"></div></div><span class="buff-bottom" id="combatBuffTurn">14T</span><div class="ui-tooltip"><strong id="combatTooltipTitle">공격 강화 +2</strong><p id="combatTooltipText">공방 효과 · 강 임시 효과<br>남은 지속시간 14턴</p></div></div>
+        <div class="buff-slot" tabindex="0" id="vitalBuff"><span class="buff-top" id="vitalBuffName">HP +20</span><div class="buff-visual" id="vitalBuffIcon"><div class="leaf"></div></div><span class="buff-bottom" id="vitalBuffTurn">8T</span><div class="ui-tooltip"><strong id="vitalTooltipTitle">도트 회복 +20</strong><p id="vitalTooltipText">피 효과 · 지속 회복<br>남은 지속시간 8턴</p></div></div>
+      </div>
+      <div class="quest-panel gold-panel" tabindex="0"><div class="gem"><span></span></div><div class="quest-name"><b>늑대 송곳니</b><small>하드 의뢰 · 수집품</small></div><div class="quest-progress" id="missionCount">1/3</div><div class="ui-tooltip"><strong>늑대 송곳니 · 수집 내역</strong><p>✦ 빛나는　0개<br>◆ 일반　　1개<br>◇ 부서진　0개<br>요구 수량　3개</p></div></div>
+      <div class="play-caption" id="playCaption" style="display:none">카드가 도착하면 자동으로 펼쳐집니다.</div>
+      <div class="event-floats" id="eventFloats" hidden>
+        <div class="float event-info"><div class="kicker">ADVENTURE · EVENT · TYPESCRIPT</div><h2>나무 아래 휴식</h2><p>잠시 쉬어 가기 좋은 나무가 보인다.<br>나무 아래서 쉬어 갈지 선택하세요.</p><div class="art"><svg viewBox="0 0 120 120" shape-rendering="crispEdges" aria-hidden="true"><rect width="120" height="120" fill="#aec99a"/><rect x="55" y="62" width="17" height="45" fill="#805b40"/><path d="M34 54V43H44V30H55V20H75V31H88V43H97V56H105V70H96V83H83V92H43V80H28V67H20V54Z" fill="#436f4c"/><path d="M39 51V39H51V29H73V39H84V50H94V65H85V77H76V82H47V73H33V62H28V51Z" fill="#75a15f"/><path d="M47 47V37H59V29H72V40H80V51H88V63H80V71H48V60H39V48Z" fill="#93b77b"/><path d="M13 102H29V108H13ZM89 99H107V108H89Z" fill="#6f9b5c"/></svg></div></div>
+        <pre class="float code-panel" aria-label="이벤트 코드">let heroHp: number = 820;
+let restRate: number = 0.65;
+let restSuccess = Math.random() &lt; restRate;
+
+if (restSuccess) {
+  hero.rest();
+}</pre>
+        <div class="action-float"><button type="button" class="gold-btn" id="restChoice">쉬어 간다</button><button type="button" class="light-btn" id="passChoice">지나간다</button></div>
+        <div class="evt-result" id="eventResult"></div>
+      </div>
+      <div class="battle-floats" id="battleFloats" hidden>
+        <div class="float battle-head"><div class="battle-main"><div class="battle-art"><div class="mob-shape"></div></div><div class="battle-data"><small>MONSTER ENCOUNTER · TS</small><h2>풀숲 슬라임</h2><div class="enemy-hp"><div class="fill" id="enemyFill"></div></div><div class="enemy-hp-num" id="enemyNum">440 / 640</div></div></div>
+        <div class="battle-status"><span id="battleLog">용사의 차례 · 행동을 선택하세요.</span><span>TURN <b id="turnNum">07</b></span></div></div>
+        <pre class="float code-panel battle-code" aria-label="전투 코드">let heroHp: number = 820;
+let monsterHp: number = 440;
+let heroHit = heroHp / (heroHp + monsterHp);
+let monsterCharged = false;
+
+// 공격 · 방어 · 차지 중 선택</pre>
+        <div class="battle-actions"><button class="gold-btn" id="battleAtk" type="button">공격</button><button class="light-btn" id="battleDef" type="button">방어</button><button class="light-btn" id="battleCharge" type="button">차지</button></div>
+      </div>
+      <div class="reward-floats" id="rewardFloats" hidden><div class="float reward-title"><div class="trophy">✦</div><h2>전투 승리!</h2><p>의뢰품은 대상 몹 처치 시 자동 수집됩니다.<br>전투 보상은 두 가지 중 하나를 선택하세요.</p></div>
+        <div class="reward-choices"><button type="button" id="rewardA"><span class="tag">A · 공격 효과</span><b>공격 강화 +2</b><small>임시 효과 · 20턴</small></button><button type="button" id="rewardB"><span class="tag">B · 피 효과</span><b>즉시 회복</b><small>HP 회복 · 일반 아이템</small></button></div>
+      </div>
+      <div class="return-floats" id="returnFloats" hidden><div class="return-card"><div class="gem-text">◆</div><h2>미션 요구량 달성!</h2><p>의뢰품을 모두 모았습니다.<br>지금 마을로 돌아가시겠습니까?</p><div class="return-actions"><button class="gold-btn" type="button" data-go="end">마을로 귀가</button><button class="light-btn" id="continueAdventure" type="button">계속 모험하기</button></div></div></div>
+    </section>
+    <section class="screen end-screen" data-scene="end"><div class="pix-bg"></div><div class="end-wash"></div><div class="gold-panel end-sheet"><div class="end-mini">ADVENTURE RESULT</div><h2 id="endTitle">모험 완료</h2><p class="status-line" id="endSub">의뢰를 마치고 마을에 돌아왔습니다.</p><div class="end-score-label">TOTAL SCORE · 시안 데이터</div><div class="end-score">12,480</div><div class="end-stats"><div><small>몬스터에게 준 피해</small><b>10,430</b></div><div><small>처치 몬스터</small><b>7</b></div><div><small>참여 카드</small><b>18 / 30</b></div><div><small>빛나는 / 일반 / 부서진</small><b>0 / 3 / 1</b></div><div><small>최종 HP</small><b>820</b></div><div><small>미션 달성</small><b>완료</b></div></div><button class="gold-btn" type="button" data-go="title">타이틀로 돌아가기</button></div></section>
+    <div class="help-layer" id="helpLayer"><div class="gold-panel help-panel"><h2>도움말</h2><p>◆ 카드 길을 따라 모험합니다. 선두 카드는 자동으로 펼쳐집니다.<br>◆ 전투: 공격 / 방어 / 차지 · 전투 전 도망 선택 가능<br>◆ 패스는 참여 게이지에 포함되지 않습니다.<br>◆ 의뢰품을 모으면 귀가를 선택할 수 있습니다.<br>◆ 제한 시간과 HP가 소진되면 모험이 종료됩니다.</p><div style="text-align:right;margin-top:19px"><button class="gold-btn" type="button" id="helpClose">확인</button></div></div></div>
+  </div>
+</div>
+<p class="demo-caption">v9 UI 시안 전용: 게임 코드·확률·전투 계산과 분리되어 있습니다. 상단 탭으로 모든 화면을 즉시 확인하고, 지역·버프·딤·자동 카드 연출을 테스트할 수 있습니다. 배경 길은 기존 참고 장면 그대로이며 이후 별도 교체 대상입니다. 실제 구현 시 버프·의뢰품 이미지는 기존 PixelCode 에셋을 사용합니다.</p>
+<script>
+const scenes={"warm":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPgo8cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iI0I5RDhERiIvPgo8cmVjdCB5PSIxMTYiIHdpZHRoPSI4MDAiIGhlaWdodD0iMTYiIGZpbGw9IiNDNURGRTAiLz4KPHJlY3QgeD0iMCIgeT0iMTMxIiB3aWR0aD0iODAwIiBoZWlnaHQ9Ijc0IiBmaWxsPSIjQjZEMUM0Ii8+CjwhLS0gYmxvY2t5IGxheWVyZWQgbW91bnRhaW5zIC0tPgo8cGF0aCBkPSJNMCAyMDJWMTc4SDUwVjE2MUg5OFYxNDZIMTI0VjE1NkgxNjRWMTc3SDIwN1YxNjRIMjU5VjE0OUgyODdWMTY3SDMzM1YxODVIMzk1VjE2MUg0NDNWMTQ3SDQ4NVYxNjRINTIyVjE3N0g1NzNWMTU4SDYwNVYxNDNINjQ2VjE2MUg2ODVWMTc5SDcyMlYxNjZINzY1VjE4M0g4MDBWMjAyWiIgZmlsbD0iIzkwQjE5RCIvPgo8cGF0aCBkPSJNMCAyMTRWMTkzSDY5VjE4OEgxMTJWMTcySDE1NlYxODdIMjA5VjE5NkgyNTRWMTc1SDMwMVYxODZIMzU0VjIwN0g0MDBWMTgzSDQ2OFYxNzFINTE1VjE5NEg1NTVWMjAySDYxNFYxNzlINjU5VjE4OUg3MDFWMjAxSDgwMFYyMTRaIiBmaWxsPSIjNzM5NTdFIi8+CjxwYXRoIGQ9Ik0wIDIzOFYyMDhIMTA0VjE5N0gxNTJWMjA4SDIxNlYyMThIMjk5VjIwNkgzNjFWMjE5SDQxNlYyMDVINDczVjIxN0g1MzJWMjAySDU5NlYyMTRINjYzVjIwNEg3MzJWMjEySDgwMFYyMzhaIiBmaWxsPSIjNjY4QjY3Ii8+CjwhLS0gZ3Jhc3NsYW5kIC0tPgo8cmVjdCB4PSIwIiB5PSIyMzAiIHdpZHRoPSI4MDAiIGhlaWdodD0iMjcwIiBmaWxsPSIjOUNCOTc4Ii8+CjxwYXRoIGQ9Ik0wIDI2M0g5NFYyNTJIMTY2VjI2NkgyNDJWMjU4SDMyMVYyNzNINDE4VjI2MUg0ODBWMjY5SDU2NlYyNTlINjUyVjI3MEg3NDJWMjYwSDgwMFY1MDBIMFoiIGZpbGw9IiNBOEM1OEEiLz4KPHBhdGggZD0iTTAgMzM4SDExOVYzMjZIMTgzVjM0M0gyNDRWMzI5SDMxNlYzNTBINDMzVjMyOUg1MjBWMzQySDYxMlYzMzFINzAwVjM0N0g4MDBWNTAwSDBaIiBmaWxsPSIjQjVEMDk2Ii8+CjxwYXRoIGQ9Ik0wIDQzMUgxNDJWNDEySDIwMVY0MjVIMjgyVjQxNEgzOTVWNDMxSDQ5MlY0MTZINjAxVjQzMEg2ODBWNDE2SDgwMFY1MDBIMFoiIGZpbGw9IiNBMUJFODAiLz4KPCEtLSB3aW5kaW5nIGdlb21ldHJpYyB0cmFpbCAtLT4KPHBhdGggZD0iTTM2OSAyMjNINDMxTDQ0NCAyNzNIMzU1TDMyOCAzMzBINDcyTDUyOCA1MDBIMjY5TDMyOCAzMzBMMzU1IDI3M1oiIGZpbGw9IiNDQ0I1OEIiLz4KPHBhdGggZD0iTTM4NyAyMjNINDExTDQxOCAyNzNIMzgwTDM3MCAzMzBINDI3TDQ1NyA1MDBIMzQyTDM3MCAzMzBMMzgwIDI3M1oiIGZpbGw9IiNENUJGOTYiLz4KPHBhdGggZD0iTTM2OSAyMjNMMzU1IDI3M0gzNjdMMzgyIDIyM1pNNDMxIDIyM0w0NDQgMjczSDQzM0w0MTggMjIzWiIgZmlsbD0iI0I2OUM3MCIvPgo8cGF0aCBkPSJNMzI4IDMzMEwyNjkgNTAwSDI4OEwzNDUgMzMwWk00NzIgMzMwTDUyOCA1MDBINTEwTDQ1NiAzMzBaIiBmaWxsPSIjQjY5QzcwIi8+CjwhLS0gdGVycmFpbiBzaGFkb3cgYW5kIGxlYXZlcyAtLT4KPHBhdGggZD0iTTMwIDI4MEg3NVYyODdIOTRWMzAySDczVjMwOUgzMlYzMDJIMTNWMjg2SDMwWiIgZmlsbD0iIzZCOTE1NSIvPgo8cGF0aCBkPSJNNzEzIDI4N0g3NjJWMjk0SDc3N1YzMTRINzU2VjMyMUg3MTFWMzExSDY5NlYyOTdINzEzWiIgZmlsbD0iIzZCOTE1NSIvPgo8cGF0aCBkPSJNNDggMzUxSDg2VjM1OEg5NlYzNzRIODBWMzgwSDQ2VjM3MkgzM1YzNTlINDhaIiBmaWxsPSIjNzE5NzU5Ii8+CjxwYXRoIGQ9Ik02OTggMzg3SDc1NFYzOTlINzY2VjQyNEg3NDhWNDM0SDY5NVY0MjJINjc5VjQwMkg2OThaIiBmaWxsPSIjNzM5NzUzIi8+CjwhLS0gdHJlZXMgbGVmdCAtLT4KPHJlY3QgeD0iMTI0IiB5PSIxOTkiIHdpZHRoPSIxNSIgaGVpZ2h0PSI3NiIgZmlsbD0iIzczNTkzQyIvPgo8cmVjdCB4PSIxMTYiIHk9IjIzMSIgd2lkdGg9IjkiIGhlaWdodD0iMjYiIGZpbGw9IiM1OTQ2MzIiLz4KPHBhdGggZD0iTTEwNyAxODlIMTUzVjIwMkgxNjZWMjIxSDE1MVYyMzVIMTExVjIyNUg5NVYyMDRIMTA3WiIgZmlsbD0iIzQ2NkY0RCIvPgo8cGF0aCBkPSJNMTE1IDE4MEgxNTFWMTk0SDE2NlYyMDVIMTUxVjIxN0gxMTRWMjA3SDEwNFYxOTBIMTE1WiIgZmlsbD0iIzYwOEE1OCIvPgo8cGF0aCBkPSJNMTIyIDE3NUgxNDJWMTkwSDE1M1YxOTdIMTM1VjIwOUgxMTdWMTk4SDEwOVYxODlIMTIyWiIgZmlsbD0iIzc1OUM2MyIvPgo8IS0tIHRyZWVzIHJpZ2h0IC0tPgo8cmVjdCB4PSI2NjAiIHk9IjE5OCIgd2lkdGg9IjE4IiBoZWlnaHQ9Ijg5IiBmaWxsPSIjNzY1ODNFIi8+CjxyZWN0IHg9IjY4MCIgeT0iMjMxIiB3aWR0aD0iOSIgaGVpZ2h0PSIzMCIgZmlsbD0iIzVFNDYzNiIvPgo8cGF0aCBkPSJNNjQwIDE4N0g2OTRWMjAwSDcxMlYyMjZINzAwVjI0MUg2MzdWMjI3SDYyNFYyMDNINjQwWiIgZmlsbD0iIzNFNkU0RSIvPgo8cGF0aCBkPSJNNjQ2IDE3OEg2ODhWMTk0SDcwNVYyMDdINjkxVjIyNEg2NDVWMjEySDYzMlYxOTVINjQ2WiIgZmlsbD0iIzUyN0Y1MiIvPgo8cGF0aCBkPSJNNjU0IDE3MUg2ODBWMTg2SDY5M1YxOTVINjc2VjIwNUg2NTRWMTk0SDY0MFYxODRINjU0WiIgZmlsbD0iIzZFOTg1RiIvPgo8IS0tIHJvY2tzIGFuZCBidXNoZXMgLS0+CjxwYXRoIGQ9Ik0xOTEgMzEwSDIxNFYzMDBIMjM3VjMwOUgyNTJWMzMzSDE5MFoiIGZpbGw9IiM3RjkxODMiLz4KPHBhdGggZD0iTTE5OCAzMDZIMjE5VjMwMkgyMzZWMzA5SDI0NFYzMjFIMTk4WiIgZmlsbD0iI0E0QTg5QSIvPgo8cGF0aCBkPSJNNTc0IDMwN0g2MDhWMjk3SDYyN1YzMDhINjQ0VjMyNkg1NzJaIiBmaWxsPSIjNzU4RjgyIi8+CjxwYXRoIGQ9Ik01ODIgMzA2SDYxMVYzMDBINjI2VjMxMEg2MzRWMzE3SDU4MloiIGZpbGw9IiNCQ0MwQTciLz4KPHBhdGggZD0iTTgxIDM4OUgxMjlWMzk5SDE0NFY0MThIMTI4VjQyNkg3OFY0MTNINjRWMzk5SDgxWiIgZmlsbD0iIzRGODM1MCIvPgo8cGF0aCBkPSJNODIgMzkxSDEyM1Y0MDFIMTM2VjQxMEgxMjJWNDE3SDc5VjQwOEg3MVY0MDBIODJaIiBmaWxsPSIjNkQ5OTVCIi8+CjxwYXRoIGQ9Ik02MDAgNDE3SDY1NFY0MjZINjY5VjQ0NUg2NTVWNDUzSDYwMVY0NDBINTg2VjQyN0g2MDBaIiBmaWxsPSIjNTU4NTUwIi8+CjxwYXRoIGQ9Ik02MDQgNDE5SDY0NFY0MjhINjU3VjQ0MEg2NDFWNDQ1SDYwNVY0MzRINTk0VjQyNkg2MDRaIiBmaWxsPSIjNzdBMDYyIi8+CjwhLS0gc2NhdHRlcmVkIG1lYWRvdyBwYXRjaGVzIC0tPgo8ZyBmaWxsPSIjN0VBQTY5Ij48cmVjdCB4PSIyMTciIHk9IjI1MiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI1MzkiIHk9IjI0OCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI2MiIgeT0iMzI3IiB3aWR0aD0iMjgiIGhlaWdodD0iNyIvPjxyZWN0IHg9IjY5NyIgeT0iMzQyIiB3aWR0aD0iMjciIGhlaWdodD0iNyIvPjxyZWN0IHg9IjE1MSIgeT0iNDQ4IiB3aWR0aD0iMzUiIGhlaWdodD0iOCIvPjxyZWN0IHg9IjcyOCIgeT0iNDcxIiB3aWR0aD0iNDAiIGhlaWdodD0iOSIvPjwvZz4KPGcgZmlsbD0iI0Q5RDM5RSI+PHJlY3QgeD0iMjY0IiB5PSIyNzIiIHdpZHRoPSI3IiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI1NTQiIHk9IjM1MyIgd2lkdGg9IjgiIGhlaWdodD0iOCIvPjxyZWN0IHg9IjE2MCIgeT0iMzE2IiB3aWR0aD0iNiIgaGVpZ2h0PSI2Ii8+PHJlY3QgeD0iNzc0IiB5PSIzNzkiIHdpZHRoPSI4IiBoZWlnaHQ9IjYiLz48L2c+Cjwvc3ZnPg==","desert":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPgo8cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iI0UyRDZCQSIvPgo8cmVjdCB5PSIxMTYiIHdpZHRoPSI4MDAiIGhlaWdodD0iMTYiIGZpbGw9IiNFQkRBQzAiLz4KPHJlY3QgeD0iMCIgeT0iMTMxIiB3aWR0aD0iODAwIiBoZWlnaHQ9Ijc0IiBmaWxsPSIjRDBCRkEwIi8+CjwhLS0gYmxvY2t5IGxheWVyZWQgbW91bnRhaW5zIC0tPgo8cGF0aCBkPSJNMCAyMDJWMTc4SDUwVjE2MUg5OFYxNDZIMTI0VjE1NkgxNjRWMTc3SDIwN1YxNjRIMjU5VjE0OUgyODdWMTY3SDMzM1YxODVIMzk1VjE2MUg0NDNWMTQ3SDQ4NVYxNjRINTIyVjE3N0g1NzNWMTU4SDYwNVYxNDNINjQ2VjE2MUg2ODVWMTc5SDcyMlYxNjZINzY1VjE4M0g4MDBWMjAyWiIgZmlsbD0iI0M1OUM3MiIvPgo8cGF0aCBkPSJNMCAyMTRWMTkzSDY5VjE4OEgxMTJWMTcySDE1NlYxODdIMjA5VjE5NkgyNTRWMTc1SDMwMVYxODZIMzU0VjIwN0g0MDBWMTgzSDQ2OFYxNzFINTE1VjE5NEg1NTVWMjAySDYxNFYxNzlINjU5VjE4OUg3MDFWMjAxSDgwMFYyMTRaIiBmaWxsPSIjQjU4OTYxIi8+CjxwYXRoIGQ9Ik0wIDIzOFYyMDhIMTA0VjE5N0gxNTJWMjA4SDIxNlYyMThIMjk5VjIwNkgzNjFWMjE5SDQxNlYyMDVINDczVjIxN0g1MzJWMjAySDU5NlYyMTRINjYzVjIwNEg3MzJWMjEySDgwMFYyMzhaIiBmaWxsPSIjQTk3OTU4Ii8+CjwhLS0gZ3Jhc3NsYW5kIC0tPgo8cmVjdCB4PSIwIiB5PSIyMzAiIHdpZHRoPSI4MDAiIGhlaWdodD0iMjcwIiBmaWxsPSIjRDFCMDdBIi8+CjxwYXRoIGQ9Ik0wIDI2M0g5NFYyNTJIMTY2VjI2NkgyNDJWMjU4SDMyMVYyNzNINDE4VjI2MUg0ODBWMjY5SDU2NlYyNTlINjUyVjI3MEg3NDJWMjYwSDgwMFY1MDBIMFoiIGZpbGw9IiNERkJFODQiLz4KPHBhdGggZD0iTTAgMzM4SDExOVYzMjZIMTgzVjM0M0gyNDRWMzI5SDMxNlYzNTBINDMzVjMyOUg1MjBWMzQySDYxMlYzMzFINzAwVjM0N0g4MDBWNTAwSDBaIiBmaWxsPSIjRTZDQTkwIi8+CjxwYXRoIGQ9Ik0wIDQzMUgxNDJWNDEySDIwMVY0MjVIMjgyVjQxNEgzOTVWNDMxSDQ5MlY0MTZINjAxVjQzMEg2ODBWNDE2SDgwMFY1MDBIMFoiIGZpbGw9IiNEOUIxN0IiLz4KPCEtLSB3aW5kaW5nIGdlb21ldHJpYyB0cmFpbCAtLT4KPHBhdGggZD0iTTM2OSAyMjNINDMxTDQ0NCAyNzNIMzU1TDMyOCAzMzBINDcyTDUyOCA1MDBIMjY5TDMyOCAzMzBMMzU1IDI3M1oiIGZpbGw9IiNCOThBNUUiLz4KPHBhdGggZD0iTTM4NyAyMjNINDExTDQxOCAyNzNIMzgwTDM3MCAzMzBINDI3TDQ1NyA1MDBIMzQyTDM3MCAzMzBMMzgwIDI3M1oiIGZpbGw9IiNEM0E2NzgiLz4KPHBhdGggZD0iTTM2OSAyMjNMMzU1IDI3M0gzNjdMMzgyIDIyM1pNNDMxIDIyM0w0NDQgMjczSDQzM0w0MTggMjIzWiIgZmlsbD0iIzlCNzc1NSIvPgo8cGF0aCBkPSJNMzI4IDMzMEwyNjkgNTAwSDI4OEwzNDUgMzMwWk00NzIgMzMwTDUyOCA1MDBINTEwTDQ1NiAzMzBaIiBmaWxsPSIjOUI3NzU1Ii8+CjwhLS0gdGVycmFpbiBzaGFkb3cgYW5kIGxlYXZlcyAtLT4KPHBhdGggZD0iTTMwIDI4MEg3NVYyODdIOTRWMzAySDczVjMwOUgzMlYzMDJIMTNWMjg2SDMwWiIgZmlsbD0iI0FFOUM2NSIvPgo8cGF0aCBkPSJNNzEzIDI4N0g3NjJWMjk0SDc3N1YzMTRINzU2VjMyMUg3MTFWMzExSDY5NlYyOTdINzEzWiIgZmlsbD0iI0FFOUM2NSIvPgo8cGF0aCBkPSJNNDggMzUxSDg2VjM1OEg5NlYzNzRIODBWMzgwSDQ2VjM3MkgzM1YzNTlINDhaIiBmaWxsPSIjQzFBNjZEIi8+CjxwYXRoIGQ9Ik02OTggMzg3SDc1NFYzOTlINzY2VjQyNEg3NDhWNDM0SDY5NVY0MjJINjc5VjQwMkg2OThaIiBmaWxsPSIjQUU4RjYwIi8+CjwhLS0gdHJlZXMgbGVmdCAtLT4KPHJlY3QgeD0iMTI0IiB5PSIxOTkiIHdpZHRoPSIxNSIgaGVpZ2h0PSI3NiIgZmlsbD0iIzczNTkzQyIvPgo8cmVjdCB4PSIxMTYiIHk9IjIzMSIgd2lkdGg9IjkiIGhlaWdodD0iMjYiIGZpbGw9IiM1OTQ2MzIiLz4KPHBhdGggZD0iTTEwNyAxODlIMTUzVjIwMkgxNjZWMjIxSDE1MVYyMzVIMTExVjIyNUg5NVYyMDRIMTA3WiIgZmlsbD0iIzhFN0I0QiIvPgo8cGF0aCBkPSJNMTE1IDE4MEgxNTFWMTk0SDE2NlYyMDVIMTUxVjIxN0gxMTRWMjA3SDEwNFYxOTBIMTE1WiIgZmlsbD0iI0FDOTY1QiIvPgo8cGF0aCBkPSJNMTIyIDE3NUgxNDJWMTkwSDE1M1YxOTdIMTM1VjIwOUgxMTdWMTk4SDEwOVYxODlIMTIyWiIgZmlsbD0iI0JFQTk2QiIvPgo8IS0tIHRyZWVzIHJpZ2h0IC0tPgo8cmVjdCB4PSI2NjAiIHk9IjE5OCIgd2lkdGg9IjE4IiBoZWlnaHQ9Ijg5IiBmaWxsPSIjNzY1ODNFIi8+CjxyZWN0IHg9IjY4MCIgeT0iMjMxIiB3aWR0aD0iOSIgaGVpZ2h0PSIzMCIgZmlsbD0iIzVFNDYzNiIvPgo8cGF0aCBkPSJNNjQwIDE4N0g2OTRWMjAwSDcxMlYyMjZINzAwVjI0MUg2MzdWMjI3SDYyNFYyMDNINjQwWiIgZmlsbD0iIzhDNzc1MCIvPgo8cGF0aCBkPSJNNjQ2IDE3OEg2ODhWMTk0SDcwNVYyMDdINjkxVjIyNEg2NDVWMjEySDYzMlYxOTVINjQ2WiIgZmlsbD0iI0EzOEI1RCIvPgo8cGF0aCBkPSJNNjU0IDE3MUg2ODBWMTg2SDY5M1YxOTVINjc2VjIwNUg2NTRWMTk0SDY0MFYxODRINjU0WiIgZmlsbD0iI0JFQTM2QSIvPgo8IS0tIHJvY2tzIGFuZCBidXNoZXMgLS0+CjxwYXRoIGQ9Ik0xOTEgMzEwSDIxNFYzMDBIMjM3VjMwOUgyNTJWMzMzSDE5MFoiIGZpbGw9IiNCNDlDODUiLz4KPHBhdGggZD0iTTE5OCAzMDZIMjE5VjMwMkgyMzZWMzA5SDI0NFYzMjFIMTk4WiIgZmlsbD0iI0Q1QkNBMSIvPgo8cGF0aCBkPSJNNTc0IDMwN0g2MDhWMjk3SDYyN1YzMDhINjQ0VjMyNkg1NzJaIiBmaWxsPSIjQUY4QTcxIi8+CjxwYXRoIGQ9Ik01ODIgMzA2SDYxMVYzMDBINjI2VjMxMEg2MzRWMzE3SDU4MloiIGZpbGw9IiNEOUJCOTMiLz4KPHBhdGggZD0iTTgxIDM4OUgxMjlWMzk5SDE0NFY0MThIMTI4VjQyNkg3OFY0MTNINjRWMzk5SDgxWiIgZmlsbD0iI0FGOTQ1NiIvPgo8cGF0aCBkPSJNODIgMzkxSDEyM1Y0MDFIMTM2VjQxMEgxMjJWNDE3SDc5VjQwOEg3MVY0MDBIODJaIiBmaWxsPSIjQzBBMTY2Ii8+CjxwYXRoIGQ9Ik02MDAgNDE3SDY1NFY0MjZINjY5VjQ0NUg2NTVWNDUzSDYwMVY0NDBINTg2VjQyN0g2MDBaIiBmaWxsPSIjQTg4QjUzIi8+CjxwYXRoIGQ9Ik02MDQgNDE5SDY0NFY0MjhINjU3VjQ0MEg2NDFWNDQ1SDYwNVY0MzRINTk0VjQyNkg2MDRaIiBmaWxsPSIjQkVBNDZCIi8+CjwhLS0gc2NhdHRlcmVkIG1lYWRvdyBwYXRjaGVzIC0tPgo8ZyBmaWxsPSIjQzJBRDZEIj48cmVjdCB4PSIyMTciIHk9IjI1MiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI1MzkiIHk9IjI0OCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI2MiIgeT0iMzI3IiB3aWR0aD0iMjgiIGhlaWdodD0iNyIvPjxyZWN0IHg9IjY5NyIgeT0iMzQyIiB3aWR0aD0iMjciIGhlaWdodD0iNyIvPjxyZWN0IHg9IjE1MSIgeT0iNDQ4IiB3aWR0aD0iMzUiIGhlaWdodD0iOCIvPjxyZWN0IHg9IjcyOCIgeT0iNDcxIiB3aWR0aD0iNDAiIGhlaWdodD0iOSIvPjwvZz4KPGcgZmlsbD0iI0VFRTFBNyI+PHJlY3QgeD0iMjY0IiB5PSIyNzIiIHdpZHRoPSI3IiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI1NTQiIHk9IjM1MyIgd2lkdGg9IjgiIGhlaWdodD0iOCIvPjxyZWN0IHg9IjE2MCIgeT0iMzE2IiB3aWR0aD0iNiIgaGVpZ2h0PSI2Ii8+PHJlY3QgeD0iNzc0IiB5PSIzNzkiIHdpZHRoPSI4IiBoZWlnaHQ9IjYiLz48L2c+Cjwvc3ZnPg==","cold":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgNTAwIiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPgo8cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iI0M1REJFNyIvPgo8cmVjdCB5PSIxMTYiIHdpZHRoPSI4MDAiIGhlaWdodD0iMTYiIGZpbGw9IiNFNEVERjIiLz4KPHJlY3QgeD0iMCIgeT0iMTMxIiB3aWR0aD0iODAwIiBoZWlnaHQ9Ijc0IiBmaWxsPSIjRDFFMUU2Ii8+CjwhLS0gYmxvY2t5IGxheWVyZWQgbW91bnRhaW5zIC0tPgo8cGF0aCBkPSJNMCAyMDJWMTc4SDUwVjE2MUg5OFYxNDZIMTI0VjE1NkgxNjRWMTc3SDIwN1YxNjRIMjU5VjE0OUgyODdWMTY3SDMzM1YxODVIMzk1VjE2MUg0NDNWMTQ3SDQ4NVYxNjRINTIyVjE3N0g1NzNWMTU4SDYwNVYxNDNINjQ2VjE2MUg2ODVWMTc5SDcyMlYxNjZINzY1VjE4M0g4MDBWMjAyWiIgZmlsbD0iI0E1QkJDNiIvPgo8cGF0aCBkPSJNMCAyMTRWMTkzSDY5VjE4OEgxMTJWMTcySDE1NlYxODdIMjA5VjE5NkgyNTRWMTc1SDMwMVYxODZIMzU0VjIwN0g0MDBWMTgzSDQ2OFYxNzFINTE1VjE5NEg1NTVWMjAySDYxNFYxNzlINjU5VjE4OUg3MDFWMjAxSDgwMFYyMTRaIiBmaWxsPSIjODM5REFEIi8+CjxwYXRoIGQ9Ik0wIDIzOFYyMDhIMTA0VjE5N0gxNTJWMjA4SDIxNlYyMThIMjk5VjIwNkgzNjFWMjE5SDQxNlYyMDVINDczVjIxN0g1MzJWMjAySDU5NlYyMTRINjYzVjIwNEg3MzJWMjEySDgwMFYyMzhaIiBmaWxsPSIjNzI4RkEwIi8+CjwhLS0gZ3Jhc3NsYW5kIC0tPgo8cmVjdCB4PSIwIiB5PSIyMzAiIHdpZHRoPSI4MDAiIGhlaWdodD0iMjcwIiBmaWxsPSIjQ0JEQ0UxIi8+CjxwYXRoIGQ9Ik0wIDI2M0g5NFYyNTJIMTY2VjI2NkgyNDJWMjU4SDMyMVYyNzNINDE4VjI2MUg0ODBWMjY5SDU2NlYyNTlINjUyVjI3MEg3NDJWMjYwSDgwMFY1MDBIMFoiIGZpbGw9IiNFMEU5RTkiLz4KPHBhdGggZD0iTTAgMzM4SDExOVYzMjZIMTgzVjM0M0gyNDRWMzI5SDMxNlYzNTBINDMzVjMyOUg1MjBWMzQySDYxMlYzMzFINzAwVjM0N0g4MDBWNTAwSDBaIiBmaWxsPSIjREZFQUVCIi8+CjxwYXRoIGQ9Ik0wIDQzMUgxNDJWNDEySDIwMVY0MjVIMjgyVjQxNEgzOTVWNDMxSDQ5MlY0MTZINjAxVjQzMEg2ODBWNDE2SDgwMFY1MDBIMFoiIGZpbGw9IiNDM0Q5RTIiLz4KPCEtLSB3aW5kaW5nIGdlb21ldHJpYyB0cmFpbCAtLT4KPHBhdGggZD0iTTM2OSAyMjNINDMxTDQ0NCAyNzNIMzU1TDMyOCAzMzBINDcyTDUyOCA1MDBIMjY5TDMyOCAzMzBMMzU1IDI3M1oiIGZpbGw9IiNBRkFFQUQiLz4KPHBhdGggZD0iTTM4NyAyMjNINDExTDQxOCAyNzNIMzgwTDM3MCAzMzBINDI3TDQ1NyA1MDBIMzQyTDM3MCAzMzBMMzgwIDI3M1oiIGZpbGw9IiNDREM4QkQiLz4KPHBhdGggZD0iTTM2OSAyMjNMMzU1IDI3M0gzNjdMMzgyIDIyM1pNNDMxIDIyM0w0NDQgMjczSDQzM0w0MTggMjIzWiIgZmlsbD0iIzkzOTU5NyIvPgo8cGF0aCBkPSJNMzI4IDMzMEwyNjkgNTAwSDI4OEwzNDUgMzMwWk00NzIgMzMwTDUyOCA1MDBINTEwTDQ1NiAzMzBaIiBmaWxsPSIjOTM5NTk3Ii8+CjwhLS0gdGVycmFpbiBzaGFkb3cgYW5kIGxlYXZlcyAtLT4KPHBhdGggZD0iTTMwIDI4MEg3NVYyODdIOTRWMzAySDczVjMwOUgzMlYzMDJIMTNWMjg2SDMwWiIgZmlsbD0iI0IyQzdDQiIvPgo8cGF0aCBkPSJNNzEzIDI4N0g3NjJWMjk0SDc3N1YzMTRINzU2VjMyMUg3MTFWMzExSDY5NlYyOTdINzEzWiIgZmlsbD0iI0IyQzdDQiIvPgo8cGF0aCBkPSJNNDggMzUxSDg2VjM1OEg5NlYzNzRIODBWMzgwSDQ2VjM3MkgzM1YzNTlINDhaIiBmaWxsPSIjQUNDNENCIi8+CjxwYXRoIGQ9Ik02OTggMzg3SDc1NFYzOTlINzY2VjQyNEg3NDhWNDM0SDY5NVY0MjJINjc5VjQwMkg2OThaIiBmaWxsPSIjQUJDMUNCIi8+CjwhLS0gdHJlZXMgbGVmdCAtLT4KPHJlY3QgeD0iMTI0IiB5PSIxOTkiIHdpZHRoPSIxNSIgaGVpZ2h0PSI3NiIgZmlsbD0iIzczNTkzQyIvPgo8cmVjdCB4PSIxMTYiIHk9IjIzMSIgd2lkdGg9IjkiIGhlaWdodD0iMjYiIGZpbGw9IiM1OTQ2MzIiLz4KPHBhdGggZD0iTTEwNyAxODlIMTUzVjIwMkgxNjZWMjIxSDE1MVYyMzVIMTExVjIyNUg5NVYyMDRIMTA3WiIgZmlsbD0iIzVBODA5MCIvPgo8cGF0aCBkPSJNMTE1IDE4MEgxNTFWMTk0SDE2NlYyMDVIMTUxVjIxN0gxMTRWMjA3SDEwNFYxOTBIMTE1WiIgZmlsbD0iIzc3OUVBQSIvPgo8cGF0aCBkPSJNMTIyIDE3NUgxNDJWMTkwSDE1M1YxOTdIMTM1VjIwOUgxMTdWMTk4SDEwOVYxODlIMTIyWiIgZmlsbD0iIzlGQkNDMyIvPgo8IS0tIHRyZWVzIHJpZ2h0IC0tPgo8cmVjdCB4PSI2NjAiIHk9IjE5OCIgd2lkdGg9IjE4IiBoZWlnaHQ9Ijg5IiBmaWxsPSIjNzY1ODNFIi8+CjxyZWN0IHg9IjY4MCIgeT0iMjMxIiB3aWR0aD0iOSIgaGVpZ2h0PSIzMCIgZmlsbD0iIzVFNDYzNiIvPgo8cGF0aCBkPSJNNjQwIDE4N0g2OTRWMjAwSDcxMlYyMjZINzAwVjI0MUg2MzdWMjI3SDYyNFYyMDNINjQwWiIgZmlsbD0iIzVDN0U4QiIvPgo8cGF0aCBkPSJNNjQ2IDE3OEg2ODhWMTk0SDcwNVYyMDdINjkxVjIyNEg2NDVWMjEySDYzMlYxOTVINjQ2WiIgZmlsbD0iIzdDOUZBQyIvPgo8cGF0aCBkPSJNNjU0IDE3MUg2ODBWMTg2SDY5M1YxOTVINjc2VjIwNUg2NTRWMTk0SDY0MFYxODRINjU0WiIgZmlsbD0iI0EyQkVDOCIvPgo8IS0tIHJvY2tzIGFuZCBidXNoZXMgLS0+CjxwYXRoIGQ9Ik0xOTEgMzEwSDIxNFYzMDBIMjM3VjMwOUgyNTJWMzMzSDE5MFoiIGZpbGw9IiM3ODhGOUUiLz4KPHBhdGggZD0iTTE5OCAzMDZIMjE5VjMwMkgyMzZWMzA5SDI0NFYzMjFIMTk4WiIgZmlsbD0iI0NBRDhEQyIvPgo8cGF0aCBkPSJNNTc0IDMwN0g2MDhWMjk3SDYyN1YzMDhINjQ0VjMyNkg1NzJaIiBmaWxsPSIjODE5QkE4Ii8+CjxwYXRoIGQ9Ik01ODIgMzA2SDYxMVYzMDBINjI2VjMxMEg2MzRWMzE3SDU4MloiIGZpbGw9IiNFNEVFRjAiLz4KPHBhdGggZD0iTTgxIDM4OUgxMjlWMzk5SDE0NFY0MThIMTI4VjQyNkg3OFY0MTNINjRWMzk5SDgxWiIgZmlsbD0iIzc4OTdBMiIvPgo8cGF0aCBkPSJNODIgMzkxSDEyM1Y0MDFIMTM2VjQxMEgxMjJWNDE3SDc5VjQwOEg3MVY0MDBIODJaIiBmaWxsPSIjOUNCOEMxIi8+CjxwYXRoIGQ9Ik02MDAgNDE3SDY1NFY0MjZINjY5VjQ0NUg2NTVWNDUzSDYwMVY0NDBINTg2VjQyN0g2MDBaIiBmaWxsPSIjNjQ4RjlEIi8+CjxwYXRoIGQ9Ik02MDQgNDE5SDY0NFY0MjhINjU3VjQ0MEg2NDFWNDQ1SDYwNVY0MzRINTk0VjQyNkg2MDRaIiBmaWxsPSIjQUFDNkNFIi8+CjwhLS0gc2NhdHRlcmVkIG1lYWRvdyBwYXRjaGVzIC0tPgo8ZyBmaWxsPSIjQjFDREQ1Ij48cmVjdCB4PSIyMTciIHk9IjI1MiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI1MzkiIHk9IjI0OCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI2MiIgeT0iMzI3IiB3aWR0aD0iMjgiIGhlaWdodD0iNyIvPjxyZWN0IHg9IjY5NyIgeT0iMzQyIiB3aWR0aD0iMjciIGhlaWdodD0iNyIvPjxyZWN0IHg9IjE1MSIgeT0iNDQ4IiB3aWR0aD0iMzUiIGhlaWdodD0iOCIvPjxyZWN0IHg9IjcyOCIgeT0iNDcxIiB3aWR0aD0iNDAiIGhlaWdodD0iOSIvPjwvZz4KPGcgZmlsbD0iI0Y0RjVFNyI+PHJlY3QgeD0iMjY0IiB5PSIyNzIiIHdpZHRoPSI3IiBoZWlnaHQ9IjYiLz48cmVjdCB4PSI1NTQiIHk9IjM1MyIgd2lkdGg9IjgiIGhlaWdodD0iOCIvPjxyZWN0IHg9IjE2MCIgeT0iMzE2IiB3aWR0aD0iNiIgaGVpZ2h0PSI2Ii8+PHJlY3QgeD0iNzc0IiB5PSIzNzkiIHdpZHRoPSI4IiBoZWlnaHQ9IjYiLz48L2c+Cjwvc3ZnPg=="};
+const game=document.getElementById('game'),clip=document.getElementById('clip');
+const nav=[...document.querySelectorAll('[data-nav]')],screens=[...document.querySelectorAll('.screen')];
+let current='title',region='warm',night=false,buffMode='attack',timers=[],battleTurn=7,enemyHp=440;
+const regionMeta={warm:['온화의 땅','TypeScript'],desert:['사막의 땅','Java'],cold:['설원의 땅','JavaScript']};
+function fit(){const s=Math.min(1,(window.innerWidth-36)/800);clip.style.width=(800*s)+'px';clip.style.height=(500*s)+'px';game.style.transform=`scale(${s})`}
+window.addEventListener('resize',fit);fit();
+function stopTimers(){for(const id of timers)clearTimeout(id);timers=[]}
+function schedule(fn,ms){timers.push(setTimeout(fn,ms))}
+function go(screen){stopTimers();current=screen;nav.forEach(b=>b.classList.toggle('active',b.dataset.nav===screen));screens.forEach(s=>s.classList.toggle('active',s.dataset.scene=== (['play','event','battle','reward','return'].includes(screen)?'road':screen)));
+  for(const id of ['eventFloats','battleFloats','rewardFloats','returnFloats'])document.getElementById(id).hidden=true;
+  const target={event:'eventFloats',battle:'battleFloats',reward:'rewardFloats',return:'returnFloats'}[screen];if(target)document.getElementById(target).hidden=false;
+  document.getElementById('playCaption').hidden=screen!=='play';
+  document.getElementById('eventResult').classList.remove('show');
+  document.getElementById('frontCard').classList.remove('leaving','growing');
+  if(screen==='battle'){battleTurn=7;enemyHp=440;refreshBattle()}
+}
+nav.forEach(b=>b.addEventListener('click',()=>go(b.dataset.nav)));
+document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
+function updateRegion(){document.querySelectorAll('.pix-bg').forEach(el=>el.style.backgroundImage=`url('${scenes[region]}')`);const meta=regionMeta[region];document.getElementById('regionName').textContent=meta[0];document.getElementById('regionSub').textContent=`${meta[1]} · 1일차 · ${night?'밤':'낮'}`;document.getElementById('sunmoon').textContent=night?'☾':'☀';document.getElementById('game').classList.toggle('night',night)}
+const regionSelect=document.getElementById('regionSelect');regionSelect.onchange=()=>{region=regionSelect.value;updateRegion()};document.getElementById('nightBtn').onclick=()=>{night=!night;document.getElementById('nightBtn').classList.toggle('on',night);document.getElementById('nightBtn').textContent=night?'낮 보기':'밤 보기';updateRegion()};updateRegion();
+const icon=(type)=>type==='attack'?'<div class="spark"></div>':type==='defense'?'<div class="shield"></div>':type==='vital'?'<div class="leaf"></div>':'';
+function buff(slot,type){const el=document.getElementById(slot+'Buff');el.classList.toggle('empty',!type);document.getElementById(slot+'BuffIcon').innerHTML=icon(type);const name=document.getElementById(slot+'BuffName'),turn=document.getElementById(slot+'BuffTurn');if(!type){name.textContent='';turn.textContent='';return}
+  name.textContent=type==='attack'?'AT +2':type==='defense'?'DF +2':'HP +20';turn.textContent=slot==='combat'?'14T':'8T'}
+function updateBuff(){buff('combat',buffMode==='empty'?null:buffMode);buff('vital',buffMode==='empty'?null:'vital');const def=buffMode==='defense';document.getElementById('combatTooltipTitle').textContent=buffMode==='empty'?'공방 효과 없음':def?'방어 강화 +2':'공격 강화 +2';document.getElementById('combatTooltipText').innerHTML=buffMode==='empty'?'비어 있는 공방 효과 슬롯':`공방 효과 · 강 임시 효과<br>남은 지속시간 14턴`;
+  document.getElementById('vitalTooltipTitle').textContent=buffMode==='empty'?'피 효과 없음':'도트 회복 +20';document.getElementById('vitalTooltipText').innerHTML=buffMode==='empty'?'비어 있는 피 효과 슬롯':'피 효과 · 지속 회복<br>남은 지속시간 8턴'}
+document.getElementById('buffSelect').onchange=e=>{buffMode=e.target.value;updateBuff()};updateBuff();
+const pips=document.getElementById('pipbar');for(let i=0;i<30;i++){const x=document.createElement('i');if(i<8)x.className='on';pips.appendChild(x)}
+const dimBtn=document.getElementById('dimBtn');dimBtn.onclick=()=>{game.classList.toggle('dim');dimBtn.classList.toggle('on',game.classList.contains('dim'))};
+function autoDemo(){go('play');document.getElementById('frontCard').classList.add('growing');schedule(()=>document.getElementById('frontCard').classList.remove('growing'),130);schedule(()=>go('event'),1000)}
+document.getElementById('autoBtn').onclick=autoDemo;
+const result=document.getElementById('eventResult');document.getElementById('restChoice').onclick=()=>{result.textContent='휴식을 선택했습니다 · 효과 결과는 실제 게임 로직에서 판정';result.classList.add('show');schedule(()=>go('play'),1600)};
+document.getElementById('passChoice').onclick=()=>{result.textContent='이벤트를 지나갑니다 · 참여 게이지 미증가';result.classList.add('show');schedule(()=>go('play'),1400)};
+function refreshBattle(){document.getElementById('enemyNum').textContent=`${enemyHp} / 640`;document.getElementById('enemyFill').style.width=`${enemyHp/640*100}%`;document.getElementById('turnNum').textContent=String(battleTurn).padStart(2,'0')}
+document.getElementById('battleAtk').onclick=()=>{enemyHp=Math.max(0,enemyHp-110);battleTurn++;refreshBattle();document.getElementById('battleLog').textContent='공격 선택 · 연출 샘플 (수치는 시안 전용)';if(enemyHp===0)schedule(()=>go('reward'),700)};
+document.getElementById('battleDef').onclick=()=>{battleTurn++;refreshBattle();document.getElementById('battleLog').textContent='방어 선택 · 연출 샘플'};
+document.getElementById('battleCharge').onclick=()=>{battleTurn++;refreshBattle();document.getElementById('battleLog').textContent='차지 선택 · 연출 샘플'};
+document.querySelectorAll('#rewardA,#rewardB').forEach(x=>x.onclick=()=>go('return'));
+document.getElementById('continueAdventure').onclick=()=>go('play');
+document.getElementById('helpBtn').onclick=()=>document.getElementById('helpLayer').classList.add('show');document.getElementById('helpClose').onclick=()=>document.getElementById('helpLayer').classList.remove('show');
+const stat={hp:10,atk:12,def:8};function updateStat(){for(const k of ['hp','atk','def'])document.getElementById('roll'+k[0].toUpperCase()+k.slice(1)).textContent=stat[k];document.getElementById('readyHp').textContent=`${stat.hp*100} / ${stat.hp*100}`;document.getElementById('readyAtk').textContent=stat.atk;document.getElementById('readyDef').textContent=stat.def}
+document.getElementById('rerollBtn').onclick=()=>{let a=5+Math.floor(Math.random()*16),b=5+Math.floor(Math.random()*(21-a));let c=30-a-b;if(c<5||c>20){a=10;b=11;c=9}Object.assign(stat,{hp:a,atk:b,def:c});updateStat()};updateStat();
+// Navigation is intentionally manual for UI review; automatic card approach is a separate preview action.
+go('title');
+</script>
+</body>
+</html>
