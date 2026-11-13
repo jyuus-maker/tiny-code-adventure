@@ -8,6 +8,16 @@ import {
   type PlatformTimerSession,
 } from './timer';
 import {
+  computeRunScore,
+  extractSdkErrorMessage,
+  INITIAL_SDK_SESSION_STATE,
+  INITIAL_SDK_SUBMIT_STATE,
+  startTinyArcadeSession,
+  submitTinyArcadeScore,
+  type SdkSessionState,
+  type SdkSubmitState,
+} from './sdk';
+import {
   drawAdventureStart,
   getEnvForParticipation,
   participationDelta,
@@ -70,7 +80,15 @@ export function GameApp({ rng = Math.random, platformSession = null }: GameAppPr
   const [localRemainingSeconds, setLocalRemainingSeconds] = useState<number>(
     ADVENTURE_TIME_LIMIT_SEC,
   );
+  const [sdkSession, setSdkSession] = useState<SdkSessionState>(
+    INITIAL_SDK_SESSION_STATE,
+  );
+  const [sdkSubmit, setSdkSubmit] = useState<SdkSubmitState>(
+    INITIAL_SDK_SUBMIT_STATE,
+  );
   const deadlineMsRef = useRef<number | null>(null);
+  const runSeqRef = useRef(0);
+  const submittedRunSeqRef = useRef<number | null>(null);
   const scale = useFrameScale();
 
   const hasPlatformSession = hasValidPlatformSession(platformSession);
@@ -121,9 +139,68 @@ export function GameApp({ rng = Math.random, platformSession = null }: GameAppPr
     };
   }, [state.phase, hasPlatformSession, platformSession?.remainingSeconds]);
 
+  // 한 판 종료(runEnd) 시 SDK 점수 제출 (한 판당 1회만 호출)
+  useEffect(() => {
+    if (state.phase !== 'runEnd') return;
+    const currentRunSeq = runSeqRef.current;
+    if (submittedRunSeqRef.current === currentRunSeq) return;
+    submittedRunSeqRef.current = currentRunSeq;
+
+    const context = state.missionId ? getMissionContext(state.missionId) : null;
+    const { totalScore } = computeRunScore({
+      heroDead: state.heroEffects?.isDead ?? false,
+      totalMobDamage: state.totalMobDamage,
+      scoreItemPoints: state.scoreItemPoints,
+      missionInventory: state.missionInventory,
+      missionTargetCount: context ? context.mission.count : null,
+    });
+
+    setSdkSubmit({
+      status: 'submitting',
+      verifyStatus: null,
+      testMode: sdkSession.testMode,
+      submittedScore: totalScore,
+      errorMessage: null,
+    });
+
+    void submitTinyArcadeScore(totalScore)
+      .then((res) => {
+        if (runSeqRef.current !== currentRunSeq) return;
+        setSdkSubmit({
+          status: 'submitted',
+          verifyStatus: res.verifyStatus,
+          testMode: res.testMode,
+          submittedScore: res.score,
+          errorMessage: null,
+        });
+      })
+      .catch((err) => {
+        if (runSeqRef.current !== currentRunSeq) return;
+        setSdkSubmit({
+          status: 'error',
+          verifyStatus: null,
+          testMode: sdkSession.testMode,
+          submittedScore: totalScore,
+          errorMessage: extractSdkErrorMessage(err),
+        });
+      });
+  }, [
+    state.phase,
+    state.missionId,
+    state.heroEffects?.isDead,
+    state.totalMobDamage,
+    state.scoreItemPoints,
+    state.missionInventory,
+    sdkSession.testMode,
+  ]);
+
   const handleRestart = () => {
+    runSeqRef.current += 1;
+    submittedRunSeqRef.current = null;
     deadlineMsRef.current = null;
     setLocalRemainingSeconds(ADVENTURE_TIME_LIMIT_SEC);
+    setSdkSession(INITIAL_SDK_SESSION_STATE);
+    setSdkSubmit(INITIAL_SDK_SUBMIT_STATE);
     setState(createInitialState());
   };
 
@@ -143,8 +220,45 @@ export function GameApp({ rng = Math.random, platformSession = null }: GameAppPr
   };
 
   const handleDepart = () => {
+    if (state.phase !== 'mission' || state.missionId === null || state.regionOrder !== null) {
+      return;
+    }
     const regionOrder = drawRegionOrder(rng);
     setState((prev) => applyDepart(prev, regionOrder));
+
+    const currentRunSeq = runSeqRef.current + 1;
+    runSeqRef.current = currentRunSeq;
+    submittedRunSeqRef.current = null;
+    setSdkSubmit(INITIAL_SDK_SUBMIT_STATE);
+    setSdkSession({
+      status: 'starting',
+      sessionId: null,
+      testMode: false,
+      loggedIn: false,
+      errorMessage: null,
+    });
+
+    void startTinyArcadeSession()
+      .then((res) => {
+        if (runSeqRef.current !== currentRunSeq) return;
+        setSdkSession({
+          status: 'started',
+          sessionId: res.sessionId,
+          testMode: res.testMode,
+          loggedIn: res.loggedIn,
+          errorMessage: null,
+        });
+      })
+      .catch((err) => {
+        if (runSeqRef.current !== currentRunSeq) return;
+        setSdkSession({
+          status: 'error',
+          sessionId: null,
+          testMode: false,
+          loggedIn: false,
+          errorMessage: extractSdkErrorMessage(err),
+        });
+      });
   };
 
   // ---- 작업 02: 카드 길 ----
@@ -340,7 +454,7 @@ export function GameApp({ rng = Math.random, platformSession = null }: GameAppPr
   return (
     <div className="game-viewport">
       <div className="game-frame" style={{ transform: `scale(${scale})` }}>
-        {renderScreen(state, displayedRemainingSeconds, {
+        {renderScreen(state, displayedRemainingSeconds, sdkSession, sdkSubmit, {
           onStart: handleStart,
           onReroll: handleReroll,
           onConfirmStats: handleConfirmStats,
@@ -390,6 +504,8 @@ type ScreenHandlers = {
 function renderScreen(
   state: GameState,
   remainingSeconds: number,
+  sdkSession: SdkSessionState,
+  sdkSubmit: SdkSubmitState,
   handlers: ScreenHandlers,
 ) {
   switch (state.phase) {
@@ -428,6 +544,7 @@ function renderScreen(
           regionOrder={state.regionOrder}
           participationCount={state.participationCount}
           timeOfDay={state.timeOfDay}
+          sdkSession={sdkSession}
           onEnterAdventure={handlers.onEnterAdventure}
         />
       );
@@ -486,6 +603,8 @@ function renderScreen(
           missionInventory={state.missionInventory}
           heroStats={state.roll?.heroStats ?? null}
           heroEffects={state.heroEffects}
+          sdkSession={sdkSession}
+          sdkSubmit={sdkSubmit}
           onRestart={handlers.onRestart}
         />
       );

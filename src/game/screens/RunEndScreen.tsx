@@ -5,6 +5,12 @@ import type { HeroStats } from '../../logic/statRoll';
 import type { HeroEffectState } from '../../logic/effects/types';
 import { PixelSprite } from '../../render/PixelSprite';
 import { GAME_FRAME_HEIGHT, GAME_FRAME_WIDTH } from '../frame';
+import {
+  computeRunScore,
+  getSubmitNotice,
+  type SdkSessionState,
+  type SdkSubmitState,
+} from '../sdk';
 
 const TITLE_BG_ASSET_ID = 'bg-title-adventure-512';
 
@@ -18,6 +24,8 @@ export type RunEndScreenProps = {
   missionInventory?: HeroMissionInventory;
   heroStats?: HeroStats | null;
   heroEffects?: HeroEffectState | null;
+  sdkSession?: SdkSessionState;
+  sdkSubmit?: SdkSubmitState;
   onRestart?: () => void;
 };
 
@@ -43,19 +51,19 @@ export function RunEndScreen({
   missionInventory = { shining: 0, normal: 0, broken: 0, totalCollected: 0 },
   heroStats = null,
   heroEffects = null,
+  sdkSession,
+  sdkSubmit,
   onRestart,
 }: RunEndScreenProps) {
   const currentHp = heroEffects ? Math.max(0, heroEffects.currentHp) : heroStats ? heroStats.hp : 0;
-  const isMissionCompleted = missionContext
-    ? missionInventory.totalCollected >= missionContext.mission.count
-    : false;
-
-  // 점수 계산: 피해량 점수 + 스코어템 점수 + 미션 완료 보너스 (사망·시간초과 시 0)
-  const missionBonus =
-    !heroDead && isMissionCompleted
-      ? (missionInventory.shining * 300 + missionInventory.normal * 150 + missionInventory.broken * 50)
-      : 0;
-  const totalScore = totalMobDamage + scoreItemPoints + missionBonus;
+  const { isMissionCompleted, totalScore } = computeRunScore({
+    heroDead,
+    totalMobDamage,
+    scoreItemPoints,
+    missionInventory,
+    missionTargetCount: missionContext ? missionContext.mission.count : null,
+  });
+  const sdkNotice = sdkSubmit ? getSubmitNotice(sdkSubmit, sdkSession) : null;
 
   const title = heroDead
     ? '용사 쓰러짐'
@@ -110,6 +118,24 @@ export function RunEndScreen({
 
         <div className="end-score-label">TOTAL SCORE</div>
         <div className="end-score">{totalScore.toLocaleString()}</div>
+        {sdkNotice && (
+          <p
+            className="sdk-notice"
+            style={{
+              margin: '4px 0 10px',
+              fontSize: 12,
+              textAlign: 'center',
+              color:
+                sdkNotice.tone === 'warn'
+                  ? '#fca5a5'
+                  : sdkNotice.tone === 'ok'
+                    ? '#86efac'
+                    : '#fde68a',
+            }}
+          >
+            {sdkNotice.text}
+          </p>
+        )}
 
         <div className="end-stats">
           <div>
