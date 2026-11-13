@@ -11,6 +11,7 @@ import {
   applyAdventureArrived,
   applyAdventureExited,
   applyAdventureOutcome,
+  applyBattleVictoryNaturalRecovery,
   applyConfirmStats,
   applyDepart,
   applyEnterAdventure,
@@ -130,6 +131,8 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
           },
         };
       }
+      // 1-2. E1 전투 승리 직후 자연회복 1회 적용 (도트힐 활성 시 ×1.5 가속)
+      next = applyBattleVictoryNaturalRecovery(next);
       // 2. 미션템 수집 반영 (§4-6)
       if (quality) {
         next = applyMissionItemCollected(next, quality);
@@ -360,6 +363,7 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
           adventure={state.adventure}
           participationCount={state.participationCount}
           heroStats={state.roll.heroStats}
+          heroRole={state.roll.dominant ?? 'balanced'}
           heroEffects={state.heroEffects}
           missionContext={context}
           missionInventory={state.missionInventory}

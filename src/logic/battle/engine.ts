@@ -7,6 +7,7 @@ import {
   type BattleConfig,
   type BattleParticipantState,
   type BattleState,
+  type HeroRole,
   type HitGrade,
   type ParticipantKind,
   type QualityLog,
@@ -15,45 +16,130 @@ import {
 export { BATTLE_DAMAGE_MULTIPLIER };
 
 /**
- * 명중률 계산 (§4-3, §4-4).
- * 원식: 자기 현재 HP / (유저 현재 HP + 몹 현재 HP).
- * 상하한 clamp 적용 시 유저 명중률과 몹 명중률의 합이 1인 보완 관계를 유지한다.
+ * E1 숨은 명중 스탯 기반 명중률 계산.
+ * hitRate = clamp(baseHitRate * (accStat / 10) - hpLossRate * hpLossPenalty, hitRateMin, hitRateMax)
+ * hpLossRate = (maxHp - currentHp) / maxHp
  */
 export function computeHitRate(
-  actorHp: number,
-  targetHp: number,
+  actorKind: ParticipantKind,
+  currentHp: number,
+  maxHp: number,
   config: BattleConfig = DEFAULT_BATTLE_CONFIG,
+  accuracyStat: number = config.accuracyStatDefault,
 ): number {
-  if (actorHp <= 0) return 0;
-  if (targetHp <= 0) return 1;
-  const raw = actorHp / (actorHp + targetHp);
-  return Math.min(config.hitRateMax, Math.max(config.hitRateMin, raw));
+  if (currentHp <= 0) return 0;
+  if (maxHp <= 0) return 1;
+
+  const baseHit =
+    actorKind === 'hero' ? config.heroBaseHitRate : config.mobBaseHitRate;
+  const penalty =
+    actorKind === 'hero' ? config.heroHpLossPenalty : config.mobHpLossPenalty;
+  const minHit =
+    actorKind === 'hero' ? config.heroHitRateMin : config.mobHitRateMin;
+
+  const accMult =
+    config.accuracyStatDefault > 0
+      ? accuracyStat / config.accuracyStatDefault
+      : 1.0;
+  const hpLossRate = Math.max(0, (maxHp - currentHp) / maxHp);
+  const raw = baseHit * accMult - hpLossRate * penalty;
+
+  return Math.min(config.hitRateMax, Math.max(minHit, raw));
+}
+
+export type BerserkRollOptions = {
+  actorRole?: HeroRole | null;
+  targetRole?: HeroRole | null;
+  actorHpRatio?: number;
+  targetHpRatio?: number;
+  actorIntensity?: number;
+  targetIntensity?: number;
+};
+
+/**
+ * 명중 판정 + 타격 등급 추첨 (버서킹 4분할 재분배 포함).
+ * 기본 분포: miss = 1 - hitRate, graze = hitRate/3, normal = hitRate/3, crit = hitRate/3.
+ * 버서킹(HP <= 45%): 비방어형 3:7 (자기 헛스윙 3, 자기 크리 7), 방어형 3:3:4 (자기 헛스윙 3, 상대 헛스윙 3, 자기 크리 4).
+ */
+export function rollAttackOutcome(
+  hitRate: number,
+  rng: Rng = Math.random,
+  config: BattleConfig = DEFAULT_BATTLE_CONFIG,
+  berserk: BerserkRollOptions = {},
+): HitGrade {
+  let pMiss = 1 - hitRate;
+  let pGraze = hitRate / 3;
+  let pNormal = hitRate / 3;
+  let pCrit = hitRate / 3;
+
+  const actorBerserk =
+    berserk.actorHpRatio !== undefined &&
+    berserk.actorHpRatio <= config.berserkHpThreshold;
+  const targetBerserk =
+    berserk.targetHpRatio !== undefined &&
+    berserk.targetHpRatio <= config.berserkHpThreshold;
+  const actorIntensity = berserk.actorIntensity ?? 1.0;
+  const targetIntensity = berserk.targetIntensity ?? 1.0;
+
+  let addSelfMiss = 0;
+  let addSelfCrit = 0;
+  let addOppMiss = 0;
+
+  if (actorBerserk && actorIntensity > 0) {
+    const s = config.berserkProbShift * actorIntensity;
+    addSelfMiss = 0.3 * s;
+    addSelfCrit = (berserk.actorRole === 'defense' ? 0.4 : 0.7) * s;
+  }
+  if (targetBerserk && berserk.targetRole === 'defense' && targetIntensity > 0) {
+    const sOpp = config.berserkProbShift * targetIntensity;
+    addOppMiss = 0.3 * sOpp;
+  }
+
+  const totalMissAdd = addSelfMiss + addOppMiss;
+  const need = totalMissAdd + addSelfCrit;
+  const pool = pGraze + pNormal;
+  const scale = need > pool && need > 0 ? pool / need : 1.0;
+
+  const aMiss = totalMissAdd * scale;
+  const aCrit = addSelfCrit * scale;
+  const taken = aMiss + aCrit;
+
+  if (pool > 0 && taken > 0) {
+    const gRatio = pGraze / pool;
+    const nRatio = pNormal / pool;
+    pGraze = Math.max(0, pGraze - taken * gRatio);
+    pNormal = Math.max(0, pNormal - taken * nRatio);
+  }
+  pMiss += aMiss;
+  pCrit += aCrit;
+
+  const sum = pMiss + pGraze + pNormal + pCrit;
+  const r = rng() * sum;
+  if (r < pMiss) return 'miss';
+  if (r < pMiss + pGraze) return 'graze';
+  if (r < pMiss + pGraze + pNormal) return 'normal';
+  return 'crit';
 }
 
 /**
- * 타격 등급 추첨 (§4-4).
- * 명중 시 빗맞힘(0.5배) / 평타(1.0배) / 크리티컬(1.x배).
+ * 하위 호환용 타격 등급 추첨 (명중 시 균등 1:1:1).
  */
 export function resolveHitGrade(
   isHit: boolean,
   rng: Rng,
-  config: BattleConfig = DEFAULT_BATTLE_CONFIG,
+  _config: BattleConfig = DEFAULT_BATTLE_CONFIG,
 ): HitGrade {
   if (!isHit) return 'miss';
-
-  const w = config.hitWeights;
-  const total = w.graze + w.normal + w.crit;
-  const r = rng() * total;
-  if (r < w.graze) return 'graze';
-  if (r < w.graze + w.normal) return 'normal';
+  const r = rng() * 3;
+  if (r < 1) return 'graze';
+  if (r < 2) return 'normal';
   return 'crit';
 }
 
-// CHK08 전투 공식 리팩토링 v1.0 기준: 기존 데미지 산출 공식에 10배 배율 적용 (1회당 약 50~200)
-
 /**
- * 기본 피해량 계산식 (§4-4).
- * (공격력 - 방어력 * 방어감소율) × 등급 배율 × 차지 배율. 명중 시 최소 피해 1.
+ * E1 비율형 방어 피해 계산식.
+ * base = (attackerAtk * attackScale * defenseK) / (effectiveDef + defenseK)
+ * final = max(minDamage, round(base * gradeMult * chargeMult * damageMultiplier))
  */
 export function calculateDamage(
   attackerAtk: number,
@@ -62,27 +148,26 @@ export function calculateDamage(
   isCharged: boolean,
   isDefending: boolean,
   config: BattleConfig = DEFAULT_BATTLE_CONFIG,
+  damageMultiplier: number = 1.0,
 ): number {
   if (hitGrade === 'miss') return 0;
 
   const gradeMult = config.hitMultipliers[hitGrade];
   const chargeMult = isCharged ? config.chargeMultiplier : 1.0;
-  // 방어 태세 시 방어력 1.5배 적용 (TEMP)
-  const effectiveDef = defenderDef * config.defenseRate * (isDefending ? 1.5 : 1.0);
-  const baseDiff = Math.max(0.1, attackerAtk - effectiveDef);
+  const effectiveDef =
+    defenderDef * config.defenseRate * (isDefending ? config.defendDefMult : 1.0);
+  const base =
+    (attackerAtk * config.attackScale * config.defenseK) /
+    (effectiveDef + config.defenseK);
 
-  // CHK08 v1.0: 기존 산출 데미지에 10배 배율 적용 (약 50~200)
-  const scale = config.damageMode === 'scaled' ? config.damageScale : BATTLE_DAMAGE_MULTIPLIER;
   return Math.max(
     config.minDamage,
-    Math.round(baseDiff * scale * gradeMult * chargeMult),
+    Math.round(base * gradeMult * chargeMult * damageMultiplier),
   );
 }
 
 /**
- * 카운터 반사 피해 계산 (§4-4).
- * 공격한 쪽이 자기 공격을 자기 방어력으로 받음.
- * 반사량 = (공격자의 공격력 - 공격자 자신의 방어력) × 등급 배율 × (차지 배율).
+ * 수동 차지 패링 카운터 반사 피해 계산 (E1 비율형 방어 공식 적용).
  */
 export function calculateCounterReflection(
   attackerAtk: number,
@@ -90,17 +175,21 @@ export function calculateCounterReflection(
   hitGrade: HitGrade,
   isCharged: boolean,
   config: BattleConfig = DEFAULT_BATTLE_CONFIG,
+  damageMultiplier: number = 1.0,
 ): number {
   if (hitGrade === 'miss') return 0;
   const gradeMult = config.hitMultipliers[hitGrade];
   const chargeMult = isCharged ? config.chargeMultiplier : 1.0;
-  const baseDiff = Math.max(0.1, attackerAtk - attackerDef * config.defenseRate);
+  const effectiveDef = attackerDef * config.defenseRate;
+  const base =
+    (attackerAtk * config.attackScale * config.defenseK) /
+    (effectiveDef + config.defenseK);
 
-  // CHK08 v1.0: 카운터 반사 데미지도 동일한 10배 배율 적용
-  const scale = config.damageMode === 'scaled' ? config.damageScale : BATTLE_DAMAGE_MULTIPLIER;
   return Math.max(
     config.minDamage,
-    Math.round(baseDiff * scale * gradeMult * chargeMult * config.counterMultiplier),
+    Math.round(
+      base * gradeMult * chargeMult * config.counterMultiplier * damageMultiplier,
+    ),
   );
 }
 
@@ -123,8 +212,16 @@ export function createBattleState(
 ): BattleState {
   return {
     config,
-    hero: { ...hero, kind: 'hero' },
-    mob: { ...mob, kind: 'mob' },
+    hero: {
+      ...hero,
+      kind: 'hero',
+      accuracy: hero.accuracy ?? config.accuracyStatDefault,
+    },
+    mob: {
+      ...mob,
+      kind: 'mob',
+      accuracy: mob.accuracy ?? config.accuracyStatDefault,
+    },
     turnCount: 0,
     activeActor: firstActor,
     winner: null,
@@ -173,10 +270,21 @@ export function stepBattle(
   let effectiveDamage = 0;
   let reflectedDamage = 0;
   let isCountered = false;
+  let lifestealHealed = 0;
+  let autoCountered = false;
+  let autoCounterDamage = 0;
 
   const targetHpBefore = defender.hp;
   const actorHpBefore = actor.hp;
   const wasCharged = actor.charged;
+
+  const actorHitRate = computeHitRate(
+    actor.kind,
+    actor.hp,
+    actor.maxHp,
+    config,
+    actor.accuracy,
+  );
 
   // 2. 행동 실행
   if (action === 'charge') {
@@ -200,14 +308,28 @@ export function stepBattle(
       actor.charged = false;
     }
 
-    const hitRate = computeHitRate(actor.hp, defender.hp, config);
-    isHit = rng() < hitRate;
-    hitGrade = resolveHitGrade(isHit, rng, config);
+    hitGrade = rollAttackOutcome(actorHitRate, rng, config, {
+      actorRole: actor.role,
+      targetRole: defender.role,
+      actorHpRatio: actor.maxHp > 0 ? actor.hp / actor.maxHp : 1,
+      targetHpRatio: defender.maxHp > 0 ? defender.hp / defender.maxHp : 1,
+      actorIntensity: isHeroTurn
+        ? config.heroBerserkIntensity
+        : config.monsterBerserkIntensity,
+      targetIntensity: isHeroTurn
+        ? config.monsterBerserkIntensity
+        : config.heroBerserkIntensity,
+    });
+    isHit = hitGrade !== 'miss';
+
+    const attackerDmgMult = isHeroTurn
+      ? config.heroDamageMultiplier
+      : config.mobDamageMultiplier;
 
     if (defender.countering) {
-      // 상대가 카운터 태세인 경우: 패링 100%, 공격자가 반사 피해를 받음 (§4-4)
+      // 상대가 수동 카운터 태세인 경우: 패링 100%, 공격자가 반사 피해를 받음 (§4-4)
       isCountered = true;
-      defender.countering = false; // 카운터 소비
+      defender.countering = false;
       rawDamage = 0;
       effectiveDamage = 0;
 
@@ -218,6 +340,7 @@ export function stepBattle(
           hitGrade,
           wasCharged,
           config,
+          attackerDmgMult,
         );
         reflectedDamage = Math.min(actor.hp, rawReflected);
         actor.hp = Math.max(0, actor.hp - reflectedDamage);
@@ -232,13 +355,59 @@ export function stepBattle(
           wasCharged,
           defender.defending,
           config,
+          attackerDmgMult,
         );
+        // 용사 차지 중 피격 시 피해 80% 경감 (기존 규칙 유지)
+        if (!isHeroTurn && defender.charged) {
+          rawDamage = Math.max(config.minDamage, Math.round(rawDamage * 0.8));
+        }
+
         effectiveDamage = Math.min(defender.hp, rawDamage);
         defender.hp = Math.max(0, defender.hp - effectiveDamage);
 
         // 방어 적용 후 방어 태세 소비
         if (defender.defending) {
           defender.defending = false;
+        }
+
+        // E1 공격형 간헐적 피흡: 공격 성공 + 실제 피해 > 0 + 패링 아님
+        if (
+          isHeroTurn &&
+          actor.role === 'attack' &&
+          effectiveDamage > 0 &&
+          config.lifestealProb > 0 &&
+          rng() < config.lifestealProb
+        ) {
+          const rawHeal = Math.round(effectiveDamage * config.lifestealRate);
+          lifestealHealed = Math.min(actor.maxHp - actor.hp, Math.max(0, rawHeal));
+          actor.hp += lifestealHealed;
+        }
+
+        // E1 방어형 간헐적 자동 카운터: 몬스터 공격 명중 + 수동 패링 아님 + 양측 생존
+        if (
+          !isHeroTurn &&
+          defender.role === 'defense' &&
+          defender.hp > 0 &&
+          actor.hp > 0 &&
+          config.autoCounterProb > 0 &&
+          rng() < config.autoCounterProb
+        ) {
+          const baseCounter = calculateDamage(
+            defender.attack,
+            actor.defense,
+            'normal',
+            false,
+            false,
+            config,
+            config.heroDamageMultiplier,
+          );
+          const rawAutoCounter = Math.max(
+            config.minDamage,
+            Math.round(baseCounter * config.autoCounterMultiplier),
+          );
+          autoCounterDamage = Math.min(actor.hp, rawAutoCounter);
+          actor.hp = Math.max(0, actor.hp - autoCounterDamage);
+          autoCountered = true;
         }
       }
     }
@@ -256,7 +425,7 @@ export function stepBattle(
     totalMobDamageTaken += effectiveDamage;
   }
   if (actor.kind === 'mob') {
-    totalMobDamageTaken += reflectedDamage;
+    totalMobDamageTaken += reflectedDamage + autoCounterDamage;
   }
 
   // 5. 미션 품질 및 막타 기록 갱신 (§4-6)
@@ -270,9 +439,16 @@ export function stepBattle(
     qualityLog.lastHitByHero = isHeroTurn;
     qualityLog.lastActionType = 'attack';
     qualityLog.lastHitWasCharged = isHeroTurn && wasCharged;
-  } else if (isCountered && reflectedDamage > 0) {
+  }
+  if (isCountered && reflectedDamage > 0) {
     qualityLog.lastHitGrade = hitGrade;
-    qualityLog.lastHitByHero = !isHeroTurn; // 반사는 카운터를 친 쪽의 유효타
+    qualityLog.lastHitByHero = !isHeroTurn;
+    qualityLog.lastActionType = 'counter';
+    qualityLog.lastHitWasCharged = false;
+  }
+  if (autoCountered && autoCounterDamage > 0 && actor.hp <= 0) {
+    qualityLog.lastHitGrade = 'normal';
+    qualityLog.lastHitByHero = true;
     qualityLog.lastActionType = 'counter';
     qualityLog.lastHitWasCharged = false;
   }
@@ -283,14 +459,12 @@ export function stepBattle(
   let tickExecuted = false;
 
   if (!targetDied && !actorDied) {
-    // 직접 사망이 아닌 경우 행동 종료 틱 1회 실행
     tickExecuted = true;
-    // (향후 작업 04 도트 효과 연결 지점)
   } else if (config.tickOnDirectDeath) {
     tickExecuted = true;
   }
 
-  // 승패 결정
+  // 승패 결정 (용사 사망 우선)
   let winner: ParticipantKind | null = null;
   let isFinished = false;
 
@@ -298,7 +472,6 @@ export function stepBattle(
   const finalMobHp = isHeroTurn ? defender.hp : actor.hp;
 
   if (finalHeroHp <= 0) {
-    // 용사 사망 시 몹 승리 (동시 사망 시에도 용사 사망 판정 우선)
     winner = 'mob';
     isFinished = true;
   } else if (finalMobHp <= 0) {
@@ -311,12 +484,15 @@ export function stepBattle(
     actor: state.activeActor,
     action,
     wasCharged,
-    hitRate: computeHitRate(actorHpBefore, targetHpBefore, config),
+    hitRate: actorHitRate,
     isHit,
     hitGrade,
     rawDamage,
     effectiveDamage,
     reflectedDamage,
+    lifestealHealed,
+    autoCountered,
+    autoCounterDamage,
     targetHpBefore,
     targetHpAfter: defender.hp,
     actorHpBefore,

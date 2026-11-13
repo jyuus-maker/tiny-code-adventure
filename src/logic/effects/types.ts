@@ -81,6 +81,16 @@ export type EffectConfig = {
   tempMaxHpValue: number;
   /** 스탯 최소 하한선 (기본: 1) */
   statMin: number;
+  /** 공격형 공격 버프 특화 보너스율 (E1: 0.25) */
+  atkBuffBonusRate: number;
+  /** 방어형 방어 버프 특화 보너스율 (E1: 0.60) */
+  defBuffBonusRate: number;
+  /** 방어형 방어 디버프 저항율 (E1: 0.65) */
+  defDebuffResistRate: number;
+  /** 생존형 즉시 회복 특화 보너스율 (E1: 0.35) */
+  instantHealBonusRate: number;
+  /** 생존형 도트힐 특화 보너스율 (E1: 0.35) */
+  dotHealBonusRate: number;
 };
 
 export const DEFAULT_EFFECT_CONFIG: EffectConfig = {
@@ -89,9 +99,14 @@ export const DEFAULT_EFFECT_CONFIG: EffectConfig = {
   normalCombatValue: 2, // // TEMP: 최소 2
   brokenCombatValue: 1, // // TEMP: 일반 - 1, 최소 1
   vitalDuration: 20, // // TEMP
-  instantHealValue: 30, // // TEMP
-  dotHealValue: 5, // // TEMP
+  instantHealValue: 300, // E1 확정 회복량
+  dotHealValue: 40, // E1 확정 도트힐 틱당 회복량
   dotDamageValue: 5, // // TEMP
   tempMaxHpValue: 50, // // TEMP
   statMin: 1,
+  atkBuffBonusRate: 0.25,
+  defBuffBonusRate: 0.6,
+  defDebuffResistRate: 0.65,
+  instantHealBonusRate: 0.35,
+  dotHealBonusRate: 0.35,
 };

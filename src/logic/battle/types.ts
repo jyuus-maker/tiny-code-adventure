@@ -4,49 +4,112 @@ export type ActionKind = 'attack' | 'defend' | 'charge';
 
 export type ParticipantKind = 'hero' | 'mob';
 
+export type HeroRole = 'attack' | 'balanced' | 'defense' | 'hp';
+
 export type BattleConfig = {
-  /** 피해 계산 모드: 'points' (메인스펙 순수 기본식) vs 'scaled' (스케일 배율 적용식) */
-  damageMode: 'points' | 'scaled';
-  /** scaled 모드 시 피해 스케일 배율 (TEMP: 10) */
-  damageScale: number;
-  /** 명중 시 최소 보장 피해량 (기본 1) */
+  /** 레거시 호환용 필드 (선택적) */
+  damageMode?: 'points' | 'scaled';
+  damageScale?: number;
+  /** 비율형 방어 공식 공격 배율 (E1: 40) */
+  attackScale: number;
+  /** 비율형 방어 공식 방어 계수 K (E1: 20) */
+  defenseK: number;
+  /** 명중 시 최소 보장 피해량 (E1: 2) */
   minDamage: number;
-  /** 방어력 감소율 계수 (기본 1.0: 공격력 - 방어력) */
+  /** 방어력 감소율 계수 (기본 1.0) */
   defenseRate: number;
-  /** 차지 공격 배율 (메인스펙: 2배 초과 가안, 기본 2.2) */
+  /** 방어 태세 시 방어력 배율 (기본 1.5) */
+  defendDefMult: number;
+  /** 차지 공격 배율 (E1: 2.0) */
   chargeMultiplier: number;
-  /** 카운터 반사 배율 (기본 1.0: 100% 반사) */
+  /** 수동 카운터 반사 배율 (기본 1.0: 100% 반사) */
   counterMultiplier: number;
-  /** 명중률 하한 (기본 0.10) */
-  hitRateMin: number;
-  /** 명중률 상한 (기본 0.90) */
+  /** 숨은 명중 스탯 기본값 (양측 동일 10, 30pt와 독립, UI 미표시) */
+  accuracyStatDefault: number;
+  /** 유저 기본 명중 확률 (E1: 0.95) */
+  heroBaseHitRate: number;
+  /** 유저 HP 손실률 명중 보정 계수 (E1: 0.20) */
+  heroHpLossPenalty: number;
+  /** 유저 명중률 하한 (E1: 0.65) */
+  heroHitRateMin: number;
+  /** 몬스터 기본 명중 확률 (E1: 0.75) */
+  mobBaseHitRate: number;
+  /** 몬스터 HP 손실률 명중 보정 계수 (E1: 0.20) */
+  mobHpLossPenalty: number;
+  /** 몬스터 명중률 하한 (E1: 0.50) */
+  mobHitRateMin: number;
+  /** 명중률 상한 (E1: 1.0) */
   hitRateMax: number;
-  /** 타격 등급 추첨 가중치 (기본: 균등 1:1:1, 비교 후보: 1:2:1) */
-  hitWeights: Record<'graze' | 'normal' | 'crit', number>;
+  /** 타격 등급 폭 STEP (E1: 0.30 -> 0.7 / 1.0 / 1.3) */
+  hitGradeStep: number;
   /** 타격 등급별 피해 배율 */
   hitMultipliers: Record<'graze' | 'normal' | 'crit', number>;
+  /** 버서킹 발동 HP 비율 기준 (E1: 0.45) */
+  berserkHpThreshold: number;
+  /** 버서킹 확률 이동량 (E1: 0.25) */
+  berserkProbShift: number;
+  /** 유저 버서킹 강도 (E1: 1.0) */
+  heroBerserkIntensity: number;
+  /** 몬스터 버서킹 강도 (E1: 0.8) */
+  monsterBerserkIntensity: number;
+  /** 유저 최종 가하는 피해 보정 (E1: 1.025) */
+  heroDamageMultiplier: number;
+  /** 몬스터 최종 가하는 피해 보정 (E1: 0.975) */
+  mobDamageMultiplier: number;
+  /** 공격형 간헐적 피흡 발동 확률 (E1: 0.20) */
+  lifestealProb: number;
+  /** 공격형 간헐적 피흡 실제 피해 흡수율 (E1: 0.30) */
+  lifestealRate: number;
+  /** 방어형 간헐적 자동 카운터 발동 확률 (E1: 0.20) */
+  autoCounterProb: number;
+  /** 방어형 간헐적 자동 카운터 피해 배율 (E1: 1.5) */
+  autoCounterMultiplier: number;
+  /** 전투 승리 시 자연회복 배율 (HP 스탯 × N, E1: 20) */
+  naturalRecoveryMult: number;
+  /** 전투 종료 시 도트힐 활성 상태일 때 자연회복 가속 배율 (E1: 1.5) */
+  dotBoostMult: number;
   /** 방어/카운터 태세 만료 정책: 자기 다음 행동 시작 시 만료 vs 상대 턴 종료 시 만료 */
   defenseExpiryPolicy: 'onNextSelfAction' | 'endOfOpponentTurn';
   /** 직접 공격으로 HP 0 도달 시 틱 실행 여부 (기본 false: 직접 사망 시 틱 스킵) */
   tickOnDirectDeath: boolean;
 };
 
-// CHK08 전투 공식 리팩토링 v1.0 기준: 기존 데미지 산출 공식에 10배 배율 적용 (1회당 약 50~200)
-// TEMP: 배율 상수 분리 (추후 v1.1 개정 시 공식 조정 또는 변경 관리)
-export const BATTLE_DAMAGE_MULTIPLIER = 10;
+// 레거시 호환 상수 (기존 참조 보존)
+export const BATTLE_DAMAGE_MULTIPLIER = 40;
 
-// TEMP: CHK 08 기본 테스트 설정값 (승인된 초기 가안)
+// CHK08 v1.1 — 5차 E1 확정 전투 설정값
 export const DEFAULT_BATTLE_CONFIG: BattleConfig = {
   damageMode: 'scaled',
   damageScale: BATTLE_DAMAGE_MULTIPLIER,
-  minDamage: 1,
+  attackScale: 40,
+  defenseK: 20,
+  minDamage: 2,
   defenseRate: 1.0,
-  chargeMultiplier: 2.2,
+  defendDefMult: 1.5,
+  chargeMultiplier: 2.0,
   counterMultiplier: 1.0,
-  hitRateMin: 0.10,
-  hitRateMax: 0.90,
-  hitWeights: { graze: 1, normal: 1, crit: 1 },
-  hitMultipliers: { graze: 0.5, normal: 1.0, crit: 1.5 },
+  accuracyStatDefault: 10,
+  heroBaseHitRate: 0.95,
+  heroHpLossPenalty: 0.2,
+  heroHitRateMin: 0.65,
+  mobBaseHitRate: 0.75,
+  mobHpLossPenalty: 0.2,
+  mobHitRateMin: 0.5,
+  hitRateMax: 1.0,
+  hitGradeStep: 0.3,
+  hitMultipliers: { graze: 0.7, normal: 1.0, crit: 1.3 },
+  berserkHpThreshold: 0.45,
+  berserkProbShift: 0.25,
+  heroBerserkIntensity: 1.0,
+  monsterBerserkIntensity: 0.8,
+  heroDamageMultiplier: 1.025,
+  mobDamageMultiplier: 0.975,
+  lifestealProb: 0.2,
+  lifestealRate: 0.3,
+  autoCounterProb: 0.2,
+  autoCounterMultiplier: 1.5,
+  naturalRecoveryMult: 20,
+  dotBoostMult: 1.5,
   defenseExpiryPolicy: 'onNextSelfAction',
   tickOnDirectDeath: false,
 };
@@ -60,6 +123,10 @@ export type BattleParticipantState = {
   maxHp: number;
   attack: number;
   defense: number;
+  /** 숨은 명중 스탯 (기본 10, UI 미표시) */
+  accuracy?: number;
+  /** 유형 특화 및 고유 효과 판별용 역할 */
+  role?: HeroRole | null;
   charged: boolean;
   defending: boolean;
   countering: boolean;
@@ -76,6 +143,9 @@ export type ActionResolution = {
   rawDamage: number;
   effectiveDamage: number;
   reflectedDamage: number;
+  lifestealHealed?: number;
+  autoCountered?: boolean;
+  autoCounterDamage?: number;
   targetHpBefore: number;
   targetHpAfter: number;
   actorHpBefore: number;

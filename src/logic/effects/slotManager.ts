@@ -53,9 +53,9 @@ export function getEffectiveAttack(
   let val = state.baseAttack + state.permanentAttackBonus;
   if (state.combatSlot) {
     if (state.combatSlot.kind === 'atk-buff') {
-      val += state.combatSlot.value;
+      val += Math.abs(state.combatSlot.value);
     } else if (state.combatSlot.kind === 'atk-debuff') {
-      val -= state.combatSlot.value;
+      val -= Math.abs(state.combatSlot.value);
     }
   }
   return Math.max(config.statMin, val);
@@ -69,9 +69,9 @@ export function getEffectiveDefense(
   let val = state.baseDefense + state.permanentDefenseBonus;
   if (state.combatSlot) {
     if (state.combatSlot.kind === 'def-buff') {
-      val += state.combatSlot.value;
+      val += Math.abs(state.combatSlot.value);
     } else if (state.combatSlot.kind === 'def-debuff') {
-      val -= state.combatSlot.value;
+      val -= Math.abs(state.combatSlot.value);
     }
   }
   return Math.max(config.statMin, val);
@@ -289,5 +289,81 @@ export function tickEffects(
   }
 
   return next;
+}
+
+export type RoleSpecializationKey = 'attack' | 'balanced' | 'defense' | 'hp' | null;
+
+/** E1 유형별 공방 슬롯 효과 특화 보정 */
+export function applyRoleSpecializationToCombatValue(
+  kind: CombatSlotEffect['kind'],
+  rawValue: number,
+  role: RoleSpecializationKey = null,
+  config: EffectConfig = DEFAULT_EFFECT_CONFIG,
+): number {
+  const absVal = Math.abs(rawValue);
+  if (role === 'attack' && kind === 'atk-buff') {
+    return Math.round(absVal * (1 + config.atkBuffBonusRate));
+  }
+  if (role === 'defense') {
+    if (kind === 'def-buff') {
+      return Math.round(absVal * (1 + config.defBuffBonusRate));
+    }
+    if (kind === 'def-debuff') {
+      return Math.max(1, Math.round(absVal * (1 - config.defDebuffResistRate)));
+    }
+  }
+  return absVal;
+}
+
+/** E1 유형별 피 슬롯/즉시 회복 특화 보정 */
+export function applyRoleSpecializationToVitalValue(
+  kind: VitalDurationKind | InstantVitalKind,
+  rawValue: number,
+  role: RoleSpecializationKey = null,
+  config: EffectConfig = DEFAULT_EFFECT_CONFIG,
+): number {
+  if (role === 'hp') {
+    if (kind === 'instant-heal') {
+      return Math.round(rawValue * (1 + config.instantHealBonusRate));
+    }
+    if (kind === 'dot-heal') {
+      return Math.round(rawValue * (1 + config.dotHealBonusRate));
+    }
+  }
+  return rawValue;
+}
+
+/**
+ * E1 전투 승리 직후 자연회복 1회 적용 (패배 시 호출 금지).
+ * - 기본 회복량: hpStat * naturalRecoveryMult (E1: 20)
+ * - 전투 종료 시 dot-heal이 유효하게 남아있으면 dotBoostMult (E1: 1.5) 가속 적용
+ * - 최대 HP를 초과하지 않음
+ */
+export function applyPostBattleNaturalRecovery(
+  state: HeroEffectState,
+  hpStat: number,
+  naturalRecoveryMult: number = 20,
+  dotBoostMult: number = 1.5,
+  config: EffectConfig = DEFAULT_EFFECT_CONFIG,
+): { nextState: HeroEffectState; healed: number; dotBoosted: boolean } {
+  if (state.isDead || naturalRecoveryMult <= 0 || hpStat <= 0) {
+    return { nextState: state, healed: 0, dotBoosted: false };
+  }
+
+  const dotBoosted = Boolean(
+    state.vitalSlot?.kind === 'dot-heal' && state.vitalSlot.remainingTurns > 0,
+  );
+  const rawRecovery = Math.round(
+    hpStat * naturalRecoveryMult * (dotBoosted ? dotBoostMult : 1.0),
+  );
+  const maxHp = getEffectiveMaxHp(state, config);
+  const nextHp = Math.min(maxHp, state.currentHp + rawRecovery);
+  const healed = Math.max(0, nextHp - state.currentHp);
+
+  return {
+    nextState: { ...state, currentHp: nextHp },
+    healed,
+    dotBoosted,
+  };
 }
 

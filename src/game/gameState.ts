@@ -1,4 +1,4 @@
-import { REGIONS, type Region } from '../config';
+import { HP_PER_POINT, REGIONS, type Region } from '../config';
 import { CLIENTS } from '../data/clients';
 import { ITEMS } from '../data/items';
 import { MISSIONS } from '../data/missions';
@@ -16,10 +16,14 @@ import type { HeroEffectState } from '../logic/effects/types';
 import {
   applyCombatSlotEffect,
   applyPermanentEffect,
+  applyPostBattleNaturalRecovery,
+  applyRoleSpecializationToCombatValue,
+  applyRoleSpecializationToVitalValue,
   applyVitalEffect,
   createInitialHeroEffectState,
   tickEffects,
 } from '../logic/effects/slotManager';
+import { DEFAULT_BATTLE_CONFIG } from '../logic/battle/types';
 import type { RewardOption } from '../logic/rewards/types';
 import {
   applyCardArrived,
@@ -255,26 +259,38 @@ export function applyRewardChoice(
   let nextEffects = { ...state.heroEffects };
   let nextScoreItemPoints = state.scoreItemPoints;
 
+  const role = state.roll?.dominant ?? 'balanced';
+
   if (option.type === 'permanent' && option.stat) {
     nextEffects = applyPermanentEffect(nextEffects, {
       stat: option.stat,
       value: option.value,
     });
   } else if (option.type === 'combat' && option.combatKind) {
+    const specValue = applyRoleSpecializationToCombatValue(
+      option.combatKind,
+      option.value,
+      role,
+    );
     nextEffects = applyCombatSlotEffect(nextEffects, {
       id: option.id,
       name: option.name,
       kind: option.combatKind,
       grade: option.grade === 'broken' ? 'broken' : 'normal',
-      value: option.value,
+      value: specValue,
       remainingTurns: option.duration ?? 20,
       maxTurns: option.duration ?? 20,
     });
   } else if (option.type === 'vital' && option.vitalKind) {
+    const specValue = applyRoleSpecializationToVitalValue(
+      option.vitalKind,
+      option.value,
+      role,
+    );
     nextEffects = applyVitalEffect(nextEffects, {
       kind: option.vitalKind,
       name: option.name,
-      value: option.value,
+      value: specValue,
       duration: option.duration,
     });
   } else if (option.type === 'score') {
@@ -285,6 +301,23 @@ export function applyRewardChoice(
     ...state,
     heroEffects: nextEffects,
     scoreItemPoints: nextScoreItemPoints,
+  };
+}
+
+/** E1 전투 승리 직후 자연회복 1회 적용 (패배 시 미적용) */
+export function applyBattleVictoryNaturalRecovery(state: GameState): GameState {
+  if (!state.heroEffects || state.heroEffects.isDead) return state;
+  const hpStat =
+    state.roll?.points.hp ?? Math.round(state.heroEffects.baseMaxHp / HP_PER_POINT);
+  const { nextState } = applyPostBattleNaturalRecovery(
+    state.heroEffects,
+    hpStat,
+    DEFAULT_BATTLE_CONFIG.naturalRecoveryMult,
+    DEFAULT_BATTLE_CONFIG.dotBoostMult,
+  );
+  return {
+    ...state,
+    heroEffects: nextState,
   };
 }
 

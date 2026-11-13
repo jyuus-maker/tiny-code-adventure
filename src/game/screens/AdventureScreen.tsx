@@ -18,6 +18,7 @@ import {
   type CardStage,
 } from '../adventure';
 import { BattleModal } from '../battle/BattleModal';
+import type { HeroRole } from '../../logic/battle';
 import '../battle/battle.css';
 import type { HeroStats } from '../../logic/statRoll';
 import type { HeroEffectState } from '../../logic/effects/types';
@@ -68,6 +69,7 @@ export type AdventureScreenProps = {
   adventure: AdventureState;
   participationCount: number;
   heroStats: HeroStats;
+  heroRole?: HeroRole | null;
   heroEffects?: HeroEffectState | null;
   missionContext?: MissionContext | null;
   missionInventory?: HeroMissionInventory;
@@ -100,6 +102,7 @@ export function AdventureScreen({
   adventure,
   participationCount,
   heroStats,
+  heroRole = 'balanced',
   heroEffects = null,
   missionContext = null,
   missionInventory = { shining: 0, normal: 0, broken: 0, totalCollected: 0 },
@@ -555,6 +558,7 @@ export function AdventureScreen({
             timeOfDay={env.timeOfDay}
             dayIndex={env.day}
             heroStats={heroStats}
+            heroRole={heroRole}
             heroEffects={heroEffects}
             missionContext={missionContext}
             forcedEncounter={linkedBattleData !== null}

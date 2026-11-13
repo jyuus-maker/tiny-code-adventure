@@ -3,11 +3,11 @@ import { MOBS } from '../../data/mobs';
 import type { Rng } from '../rng';
 import type { BattleParticipantState } from './types';
 
-// 방문 순번 배율 (언어와 무관한 일차별 배율, §4-5)
+// 방문 순번 배율 (언어와 무관한 일차별 배율, E1 확정값)
 export const DAY_MULTIPLIERS: Record<1 | 2 | 3, number> = {
-  1: 1.0,
-  2: 1.2,
-  3: 1.4,
+  1: 0.58,
+  2: 0.66,
+  3: 0.74,
 };
 
 export type SleepDepth = 'light' | 'deep';
@@ -73,6 +73,13 @@ export function createMobParticipant(
   const finalDef = Math.max(1, Math.round(defense));
   const displayName = variant?.name ?? mob.name;
 
+  const mobRole =
+    mob.type === 'attack'
+      ? 'attack'
+      : mob.type === 'defense'
+        ? 'defense'
+        : 'balanced';
+
   return {
     kind: 'mob',
     id: mob.id,
@@ -82,6 +89,8 @@ export function createMobParticipant(
     maxHp: finalHp,
     attack: finalAtk,
     defense: finalDef,
+    accuracy: 10,
+    role: mobRole,
     charged: false,
     defending: false,
     countering: false,

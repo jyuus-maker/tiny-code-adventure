@@ -20,6 +20,7 @@ import {
   type BattleConfig,
   type BattleParticipantState,
   type BattleState,
+  type HeroRole,
   type SleepDepth,
 } from '../../logic/battle';
 import type { MobCardDef } from '../cards';
@@ -54,6 +55,7 @@ export type BattleModalProps = {
   timeOfDay: TimeOfDay;
   dayIndex: 1 | 2 | 3;
   heroStats: HeroStats;
+  heroRole?: HeroRole | null;
   heroEffects?: HeroEffectState | null;
   missionContext?: MissionContext | null;
   config?: BattleConfig;
@@ -88,6 +90,7 @@ export function BattleModal({
   timeOfDay,
   dayIndex,
   heroStats,
+  heroRole = 'balanced',
   heroEffects = null,
   missionContext = null,
   config = DEFAULT_BATTLE_CONFIG,
@@ -142,6 +145,8 @@ export function BattleModal({
       maxHp: effMaxHp,
       attack: effAtk,
       defense: effDef,
+      accuracy: config.accuracyStatDefault,
+      role: heroRole ?? 'balanced',
       charged: false,
       defending: false,
       countering: false,
@@ -203,6 +208,12 @@ export function BattleModal({
               ? '빗맞힘.'
               : '명중!';
         msg = `${actorName}의 공격! (${gradeText}) ${targetName}에게 ${res.effectiveDamage} 피해!`;
+        if (res.lifestealHealed && res.lifestealHealed > 0) {
+          msg += ` (피흡 +${res.lifestealHealed} HP)`;
+        }
+        if (res.autoCountered && res.autoCounterDamage && res.autoCounterDamage > 0) {
+          msg += ` (자동 반격 ${res.autoCounterDamage} 피해!)`;
+        }
       }
     }
 
@@ -339,13 +350,19 @@ export function BattleModal({
     if (phase !== 'in-battle' || battleState.isFinished) return;
     if (battleState.activeActor === 'mob') {
       const timer = setTimeout(() => {
-        const action = chooseMobAction(battleState.mob);
+        const mobChargeCount = battleState.history.filter(
+          (h) => h.actor === 'mob' && h.action === 'charge',
+        ).length;
+        const action = chooseMobAction(battleState.mob, Math.random, undefined, {
+          dayIndex,
+          chargeUsedCount: mobChargeCount,
+        });
         const next = stepBattle(battleState, action);
         turnResolvedRef.current(next, 'mob', action);
       }, 700);
       return () => clearTimeout(timer);
     }
-  }, [phase, battleState]);
+  }, [phase, battleState, dayIndex]);
 
   const handleHeroAction = (action: ActionKind) => {
     if (phase !== 'in-battle' || battleState.activeActor !== 'hero') return;
@@ -402,17 +419,23 @@ export function BattleModal({
     }
   };
 
-  // 명중률 계산식 코드 (§6-2)
+  // 명중률 계산식 코드 (E1 숨은 명중 스탯 + HP 손실률 보정)
   const heroHp = battleState.hero.hp;
   const mobHp = battleState.mob.hp;
-  const heroHitPct = Math.round(computeHitRate(heroHp, mobHp, config) * 100);
-  const mobHitPct = Math.round(computeHitRate(mobHp, heroHp, config) * 100);
+  const heroMaxHp = battleState.hero.maxHp;
+  const mobMaxHp = battleState.mob.maxHp;
+  const heroHitPct = Math.round(
+    computeHitRate('hero', heroHp, heroMaxHp, config, battleState.hero.accuracy) * 100,
+  );
+  const mobHitPct = Math.round(
+    computeHitRate('mob', mobHp, mobMaxHp, config, battleState.mob.accuracy) * 100,
+  );
 
   const codeDisplay = `let heroHp = ${heroHp};
 let monsterHp = ${mobHp};
 let monsterCharged = ${battleState.mob.charged};
-let heroHit = heroHp / (heroHp + monsterHp);       // hero hit: ${heroHitPct}%
-let monsterHit = monsterHp / (heroHp + monsterHp); // monster hit: ${mobHitPct}%`;
+let heroHit = 0.95 - ((maxHp - heroHp) / maxHp) * 0.2;       // hero hit: ${heroHitPct}%
+let monsterHit = 0.75 - ((mMaxHp - monsterHp) / mMaxHp) * 0.2; // monster hit: ${mobHitPct}%`;
 
   const mobDef = MOBS.find((m) => m.id === actualMobId);
   const mobAssetId = mobDef?.assetId ?? battleState.mob.assetId ?? actualMobId;
