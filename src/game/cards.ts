@@ -1,3 +1,4 @@
+import type { Region } from '../config';
 import { EVENTS } from '../data/events';
 import { MOBS } from '../data/mobs';
 import type { TimeOfDay } from '../data/types';
@@ -56,6 +57,17 @@ export const EVENT_CARDS: readonly EventCardDef[] = EVENTS.map((ev) => ({
   passable: ev.passable,
   branch: ev.branch,
 }));
+
+/** 지역별 변형 이름 조회 (길 위 카드·전투·전투 후 퇴장 표시명 통일) */
+export function getMobDisplayName(
+  mobId: string | null | undefined,
+  region: Region,
+  fallback: string,
+): string {
+  if (!mobId) return fallback;
+  const mob = MOBS.find((m) => m.id === mobId);
+  return mob?.regionVariants?.[region]?.name ?? mob?.name ?? fallback;
+}
 
 /** 활동 시간대가 맞는 일반 몹 카드 (미믹 제외). 기습(ambush) 선정은 작업 03에서 다룬다 */
 export function getMobCards(timeOfDay: TimeOfDay): MobCardDef[] {

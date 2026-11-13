@@ -45,7 +45,7 @@ import {
 } from '../road';
 import '../road.css';
 import { MOBS } from '../../data/mobs';
-import type { MobCardDef } from '../cards';
+import { getMobDisplayName, type MobCardDef } from '../cards';
 import {
   createEventInstance,
   resolveEventChoice,
@@ -287,7 +287,27 @@ export function AdventureScreen({
           {props.map((p) => (
             <TerrainProp key={`${p.def.id}-${p.wraps}`} placed={p} colors={colors} />
           ))}
+        </div>
+      </div>
 
+      {/* 밤 필터(NIGHT_CSS_FILTER) 마스킹 전용 카드 3D 레이어: 배경과 동일한 원근/기울기로 배치하되 filter 제외 */}
+      <div
+        className="road-scene road-cards-layer"
+        style={{
+          perspective: `${G.perspective}px`,
+          perspectiveOrigin: `50% ${G.perspectiveOriginY * 100}%`,
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          className="road-floor"
+          style={{
+            width: G.floorWidth,
+            height: G.floorDepth,
+            marginLeft: -G.floorWidth / 2,
+            transform: `rotateX(${G.floorTilt}deg)`,
+          }}
+        >
           {[
             ...(active
               ? [
@@ -807,6 +827,10 @@ function RoadCard({ card, slot, stage, region, ref }: RoadCardProps) {
 
   const isFront = slot === 0;
   const cardTypeWord = card.def.kind === 'mob' ? 'BATTLE' : 'EVENT';
+  const displayName =
+    card.def.kind === 'mob'
+      ? getMobDisplayName(card.def.mobId, region, card.def.name)
+      : card.def.name;
 
   return (
     <div
@@ -827,7 +851,7 @@ function RoadCard({ card, slot, stage, region, ref }: RoadCardProps) {
         {isFront ? '◆　A D V E N T U R E　◆' : '◆'}
       </small>
       <div className="road-card-art">{sprite}</div>
-      <span className="road-card-name">{card.def.name}</span>
+      <span className="road-card-name">{displayName}</span>
       <span className="road-card-bottom">{cardTypeWord}</span>
     </div>
   );
@@ -839,8 +863,8 @@ function RoadCard({ card, slot, stage, region, ref }: RoadCardProps) {
 
 function TerrainProp({ placed, colors }: { placed: PlacedProp; colors: RoadColors }) {
   const { def, depth } = placed;
-  const transform = `translateY(${-depth}px) rotateX(${-G.floorTilt}deg)`;
   const scale = def.customScale ?? getPropVisualScale(def.assetId, def.shape);
+  const transform = `translateY(${-depth}px) rotateX(${-G.floorTilt}deg) translateY(${G.propGroundOffsetY}px)`;
   const marginLeft = -Math.round((128 * scale) / 2);
   return (
     <div

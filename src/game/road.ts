@@ -33,6 +33,8 @@ export const ROAD_GEOMETRY = {
   cardRiseScale: 1.06,
   /** 원경 배율(예외 배율) */
   distantScale: 6.25,
+  /** 지형지물 일괄 하단 접지 오프셋(px) // TEMP */
+  propGroundOffsetY: 35,
 } as const;
 
 // TEMP: 연출 길이 초안 (ms). 텀 2배 조정 (사용자 요청 #3)
@@ -108,6 +110,9 @@ export function getPropVisualScale(
     return 1.35;
   }
   if (lower.includes('tree') || lower.includes('pine')) {
+    if (lower.startsWith('java_') && lower.includes('desert_tree')) {
+      return 1.3 * 1.5;
+    }
     return 1.3;
   }
   if (lower.includes('bush') || lower.includes('grass') || lower.includes('scrub')) {

@@ -29,6 +29,7 @@ import {
   applyCardArrived,
   applyCardExited,
   applyCardOutcome,
+  applyPreviewReplacement,
   createAdventureState,
   getEnvForParticipation,
   TOTAL_PARTICIPATION_CARDS,
@@ -37,6 +38,7 @@ import {
   type AdventureState,
   type CardOutcome,
 } from './adventure';
+import type { CardDef } from './cards';
 
 export { TOTAL_PARTICIPATION_CARDS };
 
@@ -230,6 +232,7 @@ export function applyAdventureArrived(state: GameState): GameState {
 export function applyAdventureOutcome(
   state: GameState,
   outcome: CardOutcome,
+  previewReplacement: CardDef | null = null,
 ): GameState {
   if (state.phase !== 'adventure' || !state.adventure) return state;
   const result = applyCardOutcome(
@@ -238,9 +241,13 @@ export function applyAdventureOutcome(
     state.participationCount,
   );
   if (result.adventure === state.adventure) return state;
+  const updatedAdventure = applyPreviewReplacement(
+    result.adventure,
+    previewReplacement,
+  );
   return {
     ...state,
-    adventure: result.adventure,
+    adventure: updatedAdventure,
     participationCount: state.participationCount + result.delta,
   };
 }

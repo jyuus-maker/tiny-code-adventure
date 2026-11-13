@@ -21,6 +21,19 @@ export type RunEndScreenProps = {
   onRestart?: () => void;
 };
 
+// TEMP: 의뢰자 엔딩 대사(glad/calm/sad) 분기 조건 — 수집 등급 다수결 기준(기획 확정 시 조정)
+function resolveClientEndingTone(
+  inv: HeroMissionInventory,
+): 'glad' | 'calm' | 'sad' {
+  if (inv.shining > 0 && inv.shining >= inv.normal && inv.shining >= inv.broken) {
+    return 'glad';
+  }
+  if (inv.broken > inv.shining && inv.broken > inv.normal) {
+    return 'sad';
+  }
+  return 'calm';
+}
+
 export function RunEndScreen({
   participationCount,
   heroDead = false,
@@ -55,6 +68,12 @@ export function RunEndScreen({
       ? '의뢰를 무사히 완수하고 마을로 귀가했습니다.'
       : '의뢰를 완수하지 못한 채 모험을 마쳤습니다.';
 
+  const clientDialogue = missionContext?.client
+    ? heroDead || !isMissionCompleted
+      ? missionContext.client.failText
+      : missionContext.client.endings[resolveClientEndingTone(missionInventory)]
+    : null;
+
   return (
     <section className="screen end-screen" data-scene="end">
       {/* 배경 아트 & 딤 (타이틀과 동일한 800x500 배경 + 딤 적용) */}
@@ -71,7 +90,22 @@ export function RunEndScreen({
       <div className="gold-panel end-sheet">
         <div className="end-mini">ADVENTURE RESULT</div>
         <h2>{title}</h2>
-        <p className="status-line">{subText}</p>
+        <p className="status-line" style={clientDialogue ? { marginBottom: 8 } : undefined}>
+          {subText}
+        </p>
+        {missionContext?.client && clientDialogue && (
+          <p
+            className="client-dialogue"
+            style={{
+              fontSize: 12,
+              color: '#f8e7c4',
+              margin: '0 0 12px',
+              lineHeight: 1.5,
+            }}
+          >
+            <strong>{missionContext.client.name}</strong>: &ldquo;{clientDialogue}&rdquo;
+          </p>
+        )}
 
         <div className="end-score-label">TOTAL SCORE</div>
         <div className="end-score">{totalScore.toLocaleString()}</div>

@@ -3,7 +3,9 @@ import type { Rng } from '../logic/rng';
 import {
   drawAdventureStart,
   getEnvForParticipation,
+  participationDelta,
   planAdvance,
+  planPreviewSuitability,
   type CardOutcomeKind,
 } from './adventure';
 import { useFrameScale } from './frame';
@@ -106,7 +108,18 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
   };
 
   const handleCardOutcome = (kind: CardOutcomeKind) => {
-    setState((prev) => applyAdventureOutcome(prev, { kind }));
+    const cur = state;
+    const nextParticipation = cur.participationCount + participationDelta(kind);
+    const nextEnv = cur.regionOrder
+      ? getEnvForParticipation(nextParticipation, cur.regionOrder)
+      : null;
+    const previewReplacement =
+      cur.phase === 'adventure' && cur.adventure && nextEnv
+        ? planPreviewSuitability(nextEnv, cur.adventure, rng, getCardWeights(cur))
+        : null;
+    setState((prev) =>
+      applyAdventureOutcome(prev, { kind }, previewReplacement),
+    );
   };
 
   const handleVictoryReward = (

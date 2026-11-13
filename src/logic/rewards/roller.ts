@@ -135,9 +135,9 @@ export function createVitalOptions(
   return [
     {
       id: 'vital-instant-heal',
-      name: '체력 물약',
+      name: '체력 하트',
       description: `즉시 HP ${effectConfig.instantHealValue} 회복`,
-      assetId: 'item-jelly-64',
+      assetId: 'ui-heart-64',
       grade: 'normal',
       type: 'vital',
       category: 'hp',
@@ -146,9 +146,9 @@ export function createVitalOptions(
     },
     {
       id: 'vital-dot-heal',
-      name: '재생의 붕대',
+      name: '재생의 잎새',
       description: `행동마다 HP ${effectConfig.dotHealValue} 지속 회복 (${effectConfig.vitalDuration}턴)`,
-      assetId: 'item-fox-tail-fur-64',
+      assetId: 'ui-buff-life-64',
       grade: 'normal',
       type: 'vital',
       category: 'hp',
@@ -158,9 +158,9 @@ export function createVitalOptions(
     },
     {
       id: 'vital-temp-max-hp',
-      name: '활력의 영약',
+      name: '활력의 하트',
       description: `최대 HP +${effectConfig.tempMaxHpValue} 증가 (${effectConfig.vitalDuration}턴)`,
-      assetId: 'item-boar-tusk-64',
+      assetId: 'ui-heart-64',
       grade: 'normal',
       type: 'vital',
       category: 'hp',
@@ -203,7 +203,7 @@ export function generateCombatRewards(
     const optionA: RewardOption = isShining
       ? {
           id: `combat-atk-shining-${Date.now()}`,
-          name: `${mobItem?.name ?? '송곳니'} (빛나는)`,
+          name: `빛나는 공격의 ${mobItem?.name ?? '송곳니'}`,
           description: '공격력 영구 +1 상승 (슬롯 미점유)',
           assetId: mobItem?.assetId ?? 'item-wolf-fang-64',
           grade: 'shining',
@@ -214,7 +214,7 @@ export function generateCombatRewards(
         }
       : {
           id: `combat-atk-${grade}-${Date.now()}`,
-          name: `${mobItem?.name ?? '송곳니'} (${grade === 'normal' ? '일반' : '부서진'})`,
+          name: `${grade === 'normal' ? '일반' : '부서진'} 공격의 ${mobItem?.name ?? '송곳니'}`,
           description: `공격력 +${combatValue} 임시 버프 (${duration}턴)`,
           assetId: mobItem?.assetId ?? 'item-wolf-fang-64',
           grade,
@@ -246,7 +246,7 @@ export function generateCombatRewards(
     const optionA: RewardOption = isShining
       ? {
           id: `combat-def-shining-${Date.now()}`,
-          name: `${mobItem?.name ?? '등껍질'} (빛나는)`,
+          name: `빛나는 방어의 ${mobItem?.name ?? '등껍질'}`,
           description: '방어력 영구 +1 상승 (슬롯 미점유)',
           assetId: mobItem?.assetId ?? 'item-shell-shard-64',
           grade: 'shining',
@@ -257,7 +257,7 @@ export function generateCombatRewards(
         }
       : {
           id: `combat-def-${grade}-${Date.now()}`,
-          name: `${mobItem?.name ?? '등껍질'} (${grade === 'normal' ? '일반' : '부서진'})`,
+          name: `${grade === 'normal' ? '일반' : '부서진'} 방어의 ${mobItem?.name ?? '등껍질'}`,
           description: `방어력 +${combatValue} 임시 버프 (${duration}턴)`,
           assetId: mobItem?.assetId ?? 'item-shell-shard-64',
           grade,
@@ -299,9 +299,9 @@ export function generateCombatRewards(
 
     const optionA: RewardOption = {
       id: `mimic-buff-${Date.now()}`,
-      name: `${isAtk ? '공격' : '방어'}의 비약 (${grade === 'normal' ? '일반' : '부서진'})`,
+      name: `${grade === 'normal' ? '일반' : '부서진'} ${isAtk ? '공격' : '방어'}의 비약`,
       description: `${isAtk ? '공격력' : '방어력'} +${combatValue} 임시 버프 (${duration}턴)`,
-      assetId: isAtk ? 'item-wolf-fang-64' : 'item-shell-shard-64',
+      assetId: isAtk ? 'ui-buff-attack-64' : 'ui-buff-defense-64',
       grade: grade === 'broken' ? 'broken' : 'normal',
       type: 'combat',
       category: isAtk ? 'attack' : 'defense',
@@ -322,7 +322,7 @@ export function generateCombatRewards(
 
   const optionA: RewardOption = {
     id: `mimic-lock-${grade}-${Date.now()}`,
-    name: `미믹의 금빛 자물쇠 (${grade === 'broken' ? '부서진' : '일반'})`,
+    name: `${grade === 'broken' ? '부서진' : '일반'} 미믹의 금빛 자물쇠`,
     description: `보너스 점수 +${scoreValue}점 즉시 획득 후 소멸`,
     assetId: 'item-mimic-lock-64',
     grade: grade === 'broken' ? 'broken' : 'normal',

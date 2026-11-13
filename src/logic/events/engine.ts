@@ -268,7 +268,7 @@ export function resolveEventChoice(
       const evalRes = code ? evaluateCode(code, rng) : { path: 'then' };
       if (evalRes.path === 'then') {
         resultTitle = '상자 열기 성공';
-        resultMessage = '상자를 열었다! 안에서 반짝이는 의뢰품을 발견했다!';
+        resultMessage = '상자를 열었다! 반짝이는 의뢰품을 발견했다!';
         // 상자 직접 열기 성공 시 현재 의뢰의 빛나는 미션템 확정 지급 (§4-8, §12-3)
         missionItemCollected = { quality: 'shining' };
       } else {
