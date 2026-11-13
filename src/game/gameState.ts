@@ -448,6 +448,34 @@ export function applyAdventureExited(
   };
 }
 
+/**
+ * 제한 시간 만료(00:00) 처리 (§4-11).
+ * adventure 단계에서만 동작하며 HP 0(사망)으로 처리해 runEnd(게임오버)로 전이한다.
+ */
+export function applyTimeoutEnd(state: GameState): GameState {
+  if (state.phase !== 'adventure') return state;
+  const deadEffects: HeroEffectState = state.heroEffects
+    ? { ...state.heroEffects, currentHp: 0, isDead: true }
+    : {
+        baseAttack: state.roll?.heroStats.attack ?? 10,
+        baseDefense: state.roll?.heroStats.defense ?? 10,
+        baseMaxHp: state.roll?.heroStats.maxHp ?? 1000,
+        permanentAttackBonus: 0,
+        permanentDefenseBonus: 0,
+        permanentHpBonus: 0,
+        currentHp: 0,
+        combatSlot: null,
+        vitalSlot: null,
+        isDead: true,
+      };
+  return {
+    ...state,
+    phase: 'runEnd',
+    returnPromptPending: false,
+    heroEffects: deadEffects,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 원본 데이터 참조 (ID → 미션·의뢰자·의뢰품)
 // ---------------------------------------------------------------------------

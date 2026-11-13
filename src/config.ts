@@ -60,6 +60,10 @@ export const STAT_ROLL_ALPHA = 2;
 // TEMP: v1.2 사용자 승인 초기값 ×100 (스탯 1포인트당 HP 환산 비율). 피해량 스케일 조율은 CHK 08
 export const HP_PER_POINT = 100;
 
+// 독립 실행 시 모험 전체 제한 시간(초): 10분 = 600초 (플랫폼 세션 연동 시 플랫폼 제공 남은 시간 우선)
+export const ADVENTURE_TIME_LIMIT_SEC = 600;
+
+
 
 
 

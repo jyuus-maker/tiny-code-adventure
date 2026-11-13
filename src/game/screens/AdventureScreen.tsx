@@ -6,7 +6,8 @@ import {
   type CSSProperties,
   type Ref,
 } from 'react';
-import { NIGHT_CSS_FILTER, type Region } from '../../config';
+import { ADVENTURE_TIME_LIMIT_SEC, NIGHT_CSS_FILTER, type Region } from '../../config';
+import { formatRemainingTime } from '../timer';
 import { PixelSprite } from '../../render/PixelSprite';
 import { getAssetRegionPalette, getDistantBgId } from '../../render/region';
 import {
@@ -74,6 +75,8 @@ export type AdventureScreenProps = {
   missionContext?: MissionContext | null;
   missionInventory?: HeroMissionInventory;
   returnPromptPending?: boolean;
+  /** 상단 HUD에 표시할 남은 시간(초). 기본 600초(10:00) */
+  remainingSeconds?: number;
   /** 활성 카드가 없을 때(종료 직전) 장면 환경으로 쓸 값 */
   fallbackEnv: CardEnv;
   onArrived: () => void;
@@ -107,6 +110,7 @@ export function AdventureScreen({
   missionContext = null,
   missionInventory = { shining: 0, normal: 0, broken: 0, totalCollected: 0 },
   returnPromptPending = false,
+  remainingSeconds = ADVENTURE_TIME_LIMIT_SEC,
   fallbackEnv,
   onArrived,
   onOutcome,
@@ -393,7 +397,7 @@ export function AdventureScreen({
           <div className="progress-title">
             ◆ 모험 진행<br />남은 시간
           </div>
-          <div className="timer">10:00</div>
+          <div className="timer">{formatRemainingTime(remainingSeconds)}</div>
           <div className="count">
             <span>참여</span>
             <strong>{String(participationCount).padStart(2, '0')}</strong>

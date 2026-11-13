@@ -50,10 +50,11 @@ export function RunEndScreen({
     ? missionInventory.totalCollected >= missionContext.mission.count
     : false;
 
-  // 점수 계산: 피해량 점수 + 스코어템 점수 + 미션 완료 보너스
-  const missionBonus = isMissionCompleted
-    ? (missionInventory.shining * 300 + missionInventory.normal * 150 + missionInventory.broken * 50)
-    : 0;
+  // 점수 계산: 피해량 점수 + 스코어템 점수 + 미션 완료 보너스 (사망·시간초과 시 0)
+  const missionBonus =
+    !heroDead && isMissionCompleted
+      ? (missionInventory.shining * 300 + missionInventory.normal * 150 + missionInventory.broken * 50)
+      : 0;
   const totalScore = totalMobDamage + scoreItemPoints + missionBonus;
 
   const title = heroDead

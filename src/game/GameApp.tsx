@@ -1,5 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ADVENTURE_TIME_LIMIT_SEC } from '../config';
 import type { Rng } from '../logic/rng';
+import {
+  computeRemainingSeconds,
+  hasValidPlatformSession,
+  resolveDisplayedRemainingSeconds,
+  type PlatformTimerSession,
+} from './timer';
 import {
   drawAdventureStart,
   getEnvForParticipation,
@@ -23,6 +30,7 @@ import {
   applyReturnDecision,
   applyRewardChoice,
   applyStartStatRoll,
+  applyTimeoutEnd,
   createInitialState,
   drawMissionId,
   drawRegionOrder,
@@ -48,17 +56,73 @@ import './game.css';
 export type GameAppProps = {
   /** 난수 공급원. 기본 Math.random. 검증 시 시드 난수를 주입할 수 있다 */
   rng?: Rng;
+  /** 유효한 TinyArcade 플랫폼 세션 정보(존재 시 플랫폼 남은 시간 우선, 자체 카운트다운 미실행) */
+  platformSession?: PlatformTimerSession | null;
 };
 
 /**
  * 판 상태의 단일 소유자. 랜덤 추첨은 이벤트 핸들러에서 한 번만 수행하고,
  * 상태 갱신 함수(apply*)는 순수 함수라 StrictMode의 중복 호출에도 결과가 같다.
  */
-export function GameApp({ rng = Math.random }: GameAppProps) {
+export function GameApp({ rng = Math.random, platformSession = null }: GameAppProps) {
   const [state, setState] = useState<GameState>(createInitialState);
+  const [localRemainingSeconds, setLocalRemainingSeconds] = useState<number>(
+    ADVENTURE_TIME_LIMIT_SEC,
+  );
+  const deadlineMsRef = useRef<number | null>(null);
   const scale = useFrameScale();
 
+  const hasPlatformSession = hasValidPlatformSession(platformSession);
+  const displayedRemainingSeconds = resolveDisplayedRemainingSeconds(
+    localRemainingSeconds,
+    platformSession,
+  );
+
+  // 모험 타이머: 플랫폼 세션이 있으면 플랫폼 남은 시간만 반영하고, 없으면 실제 시각 기준 600초 카운트다운 실행
+  useEffect(() => {
+    if (state.phase !== 'adventure') {
+      deadlineMsRef.current = null;
+      setLocalRemainingSeconds(ADVENTURE_TIME_LIMIT_SEC);
+      return;
+    }
+
+    if (hasPlatformSession) {
+      deadlineMsRef.current = null;
+      if (platformSession && platformSession.remainingSeconds <= 0) {
+        setState((prev) => applyTimeoutEnd(prev));
+      }
+      return;
+    }
+
+    if (deadlineMsRef.current === null) {
+      deadlineMsRef.current = Date.now() + ADVENTURE_TIME_LIMIT_SEC * 1000;
+    }
+
+    const syncTimer = () => {
+      const deadline = deadlineMsRef.current;
+      if (deadline === null) return;
+      const nextRemaining = computeRemainingSeconds(deadline, Date.now());
+      setLocalRemainingSeconds(nextRemaining);
+      if (nextRemaining <= 0) {
+        setState((prev) => applyTimeoutEnd(prev));
+      }
+    };
+
+    syncTimer();
+    const intervalId = window.setInterval(syncTimer, 250);
+    window.addEventListener('focus', syncTimer);
+    document.addEventListener('visibilitychange', syncTimer);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncTimer);
+      document.removeEventListener('visibilitychange', syncTimer);
+    };
+  }, [state.phase, hasPlatformSession, platformSession?.remainingSeconds]);
+
   const handleRestart = () => {
+    deadlineMsRef.current = null;
+    setLocalRemainingSeconds(ADVENTURE_TIME_LIMIT_SEC);
     setState(createInitialState());
   };
 
@@ -271,7 +335,7 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
   return (
     <div className="game-viewport">
       <div className="game-frame" style={{ transform: `scale(${scale})` }}>
-        {renderScreen(state, {
+        {renderScreen(state, displayedRemainingSeconds, {
           onStart: handleStart,
           onReroll: handleReroll,
           onConfirmStats: handleConfirmStats,
@@ -316,7 +380,11 @@ type ScreenHandlers = {
   onRestart: () => void;
 };
 
-function renderScreen(state: GameState, handlers: ScreenHandlers) {
+function renderScreen(
+  state: GameState,
+  remainingSeconds: number,
+  handlers: ScreenHandlers,
+) {
   switch (state.phase) {
     case 'title':
       return <TitleScreen onStart={handlers.onStart} />;
@@ -381,6 +449,7 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
           missionContext={context}
           missionInventory={state.missionInventory}
           returnPromptPending={state.returnPromptPending}
+          remainingSeconds={remainingSeconds}
           fallbackEnv={fallbackEnv}
           onArrived={handlers.onCardArrived}
           onOutcome={handlers.onCardOutcome}
