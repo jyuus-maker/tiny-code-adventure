@@ -74,6 +74,7 @@ export type BattleModalProps = {
     finalHeroEffects?: HeroEffectState | null,
   ) => void;
   onTick?: (nextEffects: HeroEffectState) => void;
+  onSleepingMobAwaken?: (mobId: string) => void;
 };
 
 type BattlePhase =
@@ -99,6 +100,7 @@ export function BattleModal({
   onFleeSuccess,
   onDefeat,
   onTick,
+  onSleepingMobAwaken,
 }: BattleModalProps) {
   const isSleepingCard = card.encounter === 'sleeping';
 
@@ -330,6 +332,10 @@ export function BattleModal({
           mobItem,
           rewardGrade,
           isBoxExplore,
+          Math.random,
+          undefined,
+          undefined,
+          battleState.mob.name,
         );
         setRewardChoices(rewards);
 
@@ -372,6 +378,9 @@ export function BattleModal({
 
   // 선택지 핸들러
   const handleFight = () => {
+    if (isSleepingCard) {
+      onSleepingMobAwaken?.(actualMobId);
+    }
     setPhase('in-battle');
   };
 
@@ -414,6 +423,9 @@ export function BattleModal({
     if (success) {
       onFleeSuccess();
     } else {
+      if (isSleepingCard) {
+        onSleepingMobAwaken?.(actualMobId);
+      }
       setMessage('발소리에 몬스터가 눈을 떴다! 강제 전투에 돌입한다.');
       setPhase('flee-failed');
     }
@@ -508,7 +520,11 @@ let monsterHit = 0.75 - ((mMaxHp - monsterHp) / mMaxHp) * 0.2; // monster hit: $
                 <b>{rewardChoices.optionA.name}</b>
                 <small>{rewardChoices.optionA.description}</small>
                 <div className="reward-icon-box">
-                  <PixelSprite id={rewardChoices.optionA.assetId} scale={0.7} />
+                  <PixelSprite
+                    id={rewardChoices.optionA.assetId}
+                    palette={getAssetRegionPalette(rewardChoices.optionA.assetId, region)}
+                    scale={0.7}
+                  />
                 </div>
               </button>
 
@@ -537,7 +553,11 @@ let monsterHit = 0.75 - ((mMaxHp - monsterHp) / mMaxHp) * 0.2; // monster hit: $
                 <b>{rewardChoices.optionB.name}</b>
                 <small>{rewardChoices.optionB.description}</small>
                 <div className="reward-icon-box">
-                  <PixelSprite id={rewardChoices.optionB.assetId} scale={0.7} />
+                  <PixelSprite
+                    id={rewardChoices.optionB.assetId}
+                    palette={getAssetRegionPalette(rewardChoices.optionB.assetId, region)}
+                    scale={0.7}
+                  />
                 </div>
               </button>
             </div>
@@ -596,7 +616,9 @@ let monsterHit = 0.75 - ((mMaxHp - monsterHp) / mMaxHp) * 0.2; // monster hit: $
                   {isSleepingCard ? ' · 잠든 몹' : ''}
                 </small>
                 <h2>
-                  <strong style={{ fontWeight: 900 }}>{battleState.mob.name}</strong>
+                  <strong style={{ fontWeight: 900 }}>
+                    {isSleepingCard && phase === 'encounter-choice' ? '잠든 무언가' : battleState.mob.name}
+                  </strong>
                   {battleState.mob.charged && <span className="badge charge">차지</span>}
                   {battleState.mob.defending && <span className="badge defend">방어</span>}
                   {battleState.mob.countering && <span className="badge counter">카운터</span>}

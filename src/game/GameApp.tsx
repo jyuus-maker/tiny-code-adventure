@@ -29,6 +29,7 @@ import {
   applyReroll,
   applyReturnDecision,
   applyRewardChoice,
+  applySleepingMobAwaken,
   applyStartStatRoll,
   applyTimeoutEnd,
   createInitialState,
@@ -278,6 +279,10 @@ export function GameApp({ rng = Math.random, platformSession = null }: GameAppPr
     }));
   };
 
+  const handleSleepingMobAwaken = (mobId: string) => {
+    setState((prev) => applySleepingMobAwaken(prev, mobId));
+  };
+
   const handleReturnDecision = (decision: 'return' | 'continue') => {
     if (decision === 'return') {
       setState((prev) => applyReturnDecision(prev, 'return'));
@@ -348,6 +353,7 @@ export function GameApp({ rng = Math.random, platformSession = null }: GameAppPr
           onDefeat: handleDefeat,
           onEffectsTick: handleEffectsTick,
           onReturnDecision: handleReturnDecision,
+          onSleepingMobAwaken: handleSleepingMobAwaken,
           onRestart: handleRestart,
         })}
       </div>
@@ -377,6 +383,7 @@ type ScreenHandlers = {
   ) => void;
   onEffectsTick: (effects: HeroEffectState) => void;
   onReturnDecision: (decision: 'return' | 'continue') => void;
+  onSleepingMobAwaken: (mobId: string) => void;
   onRestart: () => void;
 };
 
@@ -458,6 +465,7 @@ function renderScreen(
           onDefeat={handlers.onDefeat}
           onEffectsTick={handlers.onEffectsTick}
           onReturnDecision={handlers.onReturnDecision}
+          onSleepingMobAwaken={handlers.onSleepingMobAwaken}
         />
       );
     }

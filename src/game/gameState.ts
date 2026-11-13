@@ -2,6 +2,7 @@ import { HP_PER_POINT, REGIONS, type Region } from '../config';
 import { CLIENTS } from '../data/clients';
 import { ITEMS } from '../data/items';
 import { MISSIONS } from '../data/missions';
+import { MOBS } from '../data/mobs';
 import type { Item, Mission, MissionClient, TimeOfDay } from '../data/types';
 import type { Rng } from '../logic/rng';
 import {
@@ -30,6 +31,7 @@ import {
   applyCardExited,
   applyCardOutcome,
   applyPreviewReplacement,
+  applySleepingMobAwakened,
   createAdventureState,
   getEnvForParticipation,
   TOTAL_PARTICIPATION_CARDS,
@@ -225,6 +227,23 @@ export function applyEnterAdventure(
 export function applyAdventureArrived(state: GameState): GameState {
   if (state.phase !== 'adventure' || !state.adventure) return state;
   const adventure = applyCardArrived(state.adventure);
+  return adventure === state.adventure ? state : { ...state, adventure };
+}
+
+/** 잠든 몬스터가 깨어났을 때 활성 카드에 실제 몬스터 정보를 반영한다 */
+export function applySleepingMobAwaken(
+  state: GameState,
+  mobId: string,
+): GameState {
+  if (state.phase !== 'adventure' || !state.adventure) return state;
+  const mob = MOBS.find((m) => m.id === mobId);
+  if (!mob) return state;
+  const adventure = applySleepingMobAwakened(
+    state.adventure,
+    mob.id,
+    mob.name,
+    mob.assetId,
+  );
   return adventure === state.adventure ? state : { ...state, adventure };
 }
 

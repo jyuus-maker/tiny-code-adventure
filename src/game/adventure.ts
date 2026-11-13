@@ -276,6 +276,36 @@ export function applyCardArrived(adv: AdventureState): AdventureState {
   return { ...adv, stage: 'open' };
 }
 
+/** 잠든 몬스터가 깨어날 때 활성 카드의 실제 몬스터 ID·이름·에셋을 반영한다 (baseId·encounter 유지) */
+export function applySleepingMobAwakened(
+  adv: AdventureState,
+  mobId: string,
+  mobName: string,
+  mobAssetId: string,
+): AdventureState {
+  const card = adv.active;
+  if (
+    !card ||
+    card.def.kind !== 'mob' ||
+    card.def.encounter !== 'sleeping' ||
+    card.def.mobId !== null
+  ) {
+    return adv;
+  }
+  return {
+    ...adv,
+    active: {
+      ...card,
+      def: {
+        ...card.def,
+        mobId,
+        name: mobName,
+        assetId: mobAssetId,
+      },
+    },
+  };
+}
+
 export type OutcomeResult = {
   adventure: AdventureState;
   /** 참여 수 증가분 */

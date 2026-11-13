@@ -95,6 +95,7 @@ export type AdventureScreenProps = {
   ) => void;
   onEffectsTick?: (effects: HeroEffectState) => void;
   onReturnDecision?: (decision: 'return' | 'continue') => void;
+  onSleepingMobAwaken?: (mobId: string) => void;
 };
 
 type ModalRect = { left: number; top: number; width: number; height: number };
@@ -119,6 +120,7 @@ export function AdventureScreen({
   onDefeat,
   onEffectsTick,
   onReturnDecision,
+  onSleepingMobAwaken,
 }: AdventureScreenProps) {
   const { active, preview, stage, advanceCount } = adventure;
   const env = active?.env ?? fallbackEnv;
@@ -603,6 +605,7 @@ export function AdventureScreen({
               onDefeat?.(finalHp, finalEffects);
             }}
             onTick={onEffectsTick}
+            onSleepingMobAwaken={onSleepingMobAwaken}
           />
         ) : (
           <div className="event-floats">

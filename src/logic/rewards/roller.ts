@@ -171,6 +171,26 @@ export function createVitalOptions(
   ];
 }
 
+/** 공격형·방어형 몹 고유 아이템의 부자재명 (§5-1: 몹 표시명 + 부자재명) */
+const MOB_ITEM_PART_NAME: Readonly<Record<string, string>> = {
+  'shell-shard': '등껍질',
+  'stone-griddle': '돌판',
+  'wolf-fang': '송곳니',
+  'bat-wing': '날개',
+};
+
+function resolveMobRewardItemName(
+  mobItem: Item | undefined,
+  mobDisplayName: string | undefined,
+  fallback: string,
+): string {
+  if (mobItem && mobDisplayName) {
+    const partName = MOB_ITEM_PART_NAME[mobItem.id];
+    if (partName) return `${mobDisplayName} ${partName}`;
+  }
+  return mobItem?.name ?? fallback;
+}
+
 /**
  * 전투 승리 보상 2택 1 생성기 (§4-6)
  * - 항상 2개 중 택 1
@@ -185,6 +205,7 @@ export function generateCombatRewards(
   rng: Rng = Math.random,
   effectConfig: EffectConfig = DEFAULT_EFFECT_CONFIG,
   scoreConfig: ScoreConfig = DEFAULT_SCORE_CONFIG,
+  mobDisplayName?: string,
 ): RewardChoicePair {
   const vitalPool = createVitalOptions(effectConfig);
 
@@ -199,11 +220,12 @@ export function generateCombatRewards(
       grade === 'normal'
         ? effectConfig.normalCombatDuration
         : effectConfig.brokenCombatDuration;
+    const itemName = resolveMobRewardItemName(mobItem, mobDisplayName, '송곳니');
 
     const optionA: RewardOption = isShining
       ? {
           id: `combat-atk-shining-${Date.now()}`,
-          name: `빛나는 공격의 ${mobItem?.name ?? '송곳니'}`,
+          name: `빛나는 공격의 ${itemName}`,
           description: '공격력 영구 +1 상승 (슬롯 미점유)',
           assetId: mobItem?.assetId ?? 'item-wolf-fang-64',
           grade: 'shining',
@@ -214,7 +236,7 @@ export function generateCombatRewards(
         }
       : {
           id: `combat-atk-${grade}-${Date.now()}`,
-          name: `${grade === 'normal' ? '일반' : '부서진'} 공격의 ${mobItem?.name ?? '송곳니'}`,
+          name: `${grade === 'normal' ? '일반' : '부서진'} 공격의 ${itemName}`,
           description: `공격력 +${combatValue} 임시 버프 (${duration}턴)`,
           assetId: mobItem?.assetId ?? 'item-wolf-fang-64',
           grade,
@@ -242,11 +264,12 @@ export function generateCombatRewards(
       grade === 'normal'
         ? effectConfig.normalCombatDuration
         : effectConfig.brokenCombatDuration;
+    const itemName = resolveMobRewardItemName(mobItem, mobDisplayName, '등껍질');
 
     const optionA: RewardOption = isShining
       ? {
           id: `combat-def-shining-${Date.now()}`,
-          name: `빛나는 방어의 ${mobItem?.name ?? '등껍질'}`,
+          name: `빛나는 방어의 ${itemName}`,
           description: '방어력 영구 +1 상승 (슬롯 미점유)',
           assetId: mobItem?.assetId ?? 'item-shell-shard-64',
           grade: 'shining',
@@ -257,7 +280,7 @@ export function generateCombatRewards(
         }
       : {
           id: `combat-def-${grade}-${Date.now()}`,
-          name: `${grade === 'normal' ? '일반' : '부서진'} 방어의 ${mobItem?.name ?? '등껍질'}`,
+          name: `${grade === 'normal' ? '일반' : '부서진'} 방어의 ${itemName}`,
           description: `방어력 +${combatValue} 임시 버프 (${duration}턴)`,
           assetId: mobItem?.assetId ?? 'item-shell-shard-64',
           grade,
