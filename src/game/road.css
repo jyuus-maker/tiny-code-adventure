@@ -15,8 +15,11 @@
 
 .game-frame .road-distant {
   position: absolute;
-  left: 50%;
+  left: 0;
+  top: 0;
+  width: 100%;
   pointer-events: none;
+  overflow: hidden;
 }
 
 /* 길 바닥: 프레임 아래 가장자리를 축으로 눕힌다 */
@@ -43,7 +46,7 @@
   overflow: hidden;
 }
 
-/* 카드: 바닥 위에 세워 둔다. transform은 인라인(깊이·단계별) */
+/* 카드: 바닥 위에 세워 둔다. transform은 인라인(깊이·단계별) (UI v9.1 목업 반영) */
 .game-frame .road-card {
   position: absolute;
   left: 50%;
@@ -53,38 +56,73 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #fdf6e3;
-  border: 6px solid #3b2f2f;
-  border-radius: 10px;
-  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.25);
+  background: #f9efdb;
+  border: 4px solid #4c3e46;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #c6a36b, 0 9px 18px #111a2569, inset 0 0 0 2px #bd9b6f;
   box-sizing: border-box;
   transition-property: transform, opacity;
   transition-timing-function: ease-in-out;
   opacity: 1;
+  color: #54433d;
+}
+
+.game-frame .road-card::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid #ccb68e;
+  pointer-events: none;
+}
+
+.game-frame .road-card-top {
+  position: relative;
+  margin-top: 10px;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: #aa885c;
+  font-weight: 850;
+  z-index: 1;
+  white-space: nowrap;
 }
 
 .game-frame .road-card-art {
-  width: 256px;
-  height: 256px;
+  width: 216px;
+  height: 216px;
   margin-top: 8px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: rgba(59, 47, 47, 0.08);
-  border-radius: 6px;
+  background: #b3ca99;
+  border: 2px solid #c8aa81;
+  position: relative;
+  z-index: 1;
 }
 
 .game-frame .road-card-name {
-  margin-top: 8px;
-  font-size: 22px;
-  font-weight: 700;
-  color: #3b2f2f;
+  margin-top: 5px;
+  font-size: 20px;
+  font-weight: 900;
+  color: #4c3e46;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.game-frame .road-card-bottom {
+  position: relative;
+  top: -3px;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 2.5px;
+  color: #9d896e;
+  z-index: 1;
   white-space: nowrap;
 }
 
 .game-frame .road-card-open {
-  box-shadow: 0 18px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 2px #c6a36b, 0 20px 32px rgba(0, 0, 0, 0.45), inset 0 0 0 2px #bd9b6f;
 }
 
 .game-frame .road-card-exit-pass,
@@ -97,7 +135,8 @@
 .game-frame .road-prop {
   position: absolute;
   bottom: 0;
-  margin-left: -48px;
+  /* 지형지물 에셋 128px × 표시 배율 1(propScale) = 128px 폭의 절반(-64px). x는 길 중심에서 소품 중심까지 거리 */
+  margin-left: -64px;
   transform-origin: 50% 100%;
   transition: transform var(--road-advance) ease-in-out;
   pointer-events: none;

@@ -38,16 +38,22 @@ export function PixelRectsGroup({ id, palette }: PixelRectsGroupProps) {
 export type PixelSpriteProps = {
   id: string;
   palette?: number[][];
-  scale: number;
+  scale?: number;
   flip?: boolean;
+  width?: number | string;
+  height?: number | string;
+  preserveAspectRatio?: string;
 };
 
 
 export function PixelSprite({
   id,
   palette,
-  scale,
+  scale = 1,
   flip = false,
+  width,
+  height,
+  preserveAspectRatio,
 }: PixelSpriteProps) {
   const asset = getAsset(id);
   if (!asset) {
@@ -56,14 +62,15 @@ export function PixelSprite({
 
   const rects = getAssetRects(id);
   const activePalette = palette ?? asset.palette;
-  const displayWidth = asset.width * scale;
-  const displayHeight = asset.height * scale;
+  const displayWidth = width ?? asset.width * scale;
+  const displayHeight = height ?? asset.height * scale;
 
   return (
     <svg
       width={displayWidth}
       height={displayHeight}
       viewBox={`0 0 ${asset.width} ${asset.height}`}
+      preserveAspectRatio={preserveAspectRatio}
       shapeRendering="crispEdges"
       style={{
         display: 'block',

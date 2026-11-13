@@ -1,4 +1,4 @@
-import { REGIONS, type Region } from '../config';
+import { HP_PER_POINT, REGIONS, type Region } from '../config';
 import { CLIENTS } from '../data/clients';
 import { ITEMS } from '../data/items';
 import { MISSIONS } from '../data/missions';
@@ -11,10 +11,25 @@ import {
   type HeroStats,
   type StatPoints,
 } from '../logic/statRoll';
+import type { ItemGrade } from '../render/types';
+import type { HeroEffectState } from '../logic/effects/types';
+import {
+  applyCombatSlotEffect,
+  applyPermanentEffect,
+  applyPostBattleNaturalRecovery,
+  applyRoleSpecializationToCombatValue,
+  applyRoleSpecializationToVitalValue,
+  applyVitalEffect,
+  createInitialHeroEffectState,
+  tickEffects,
+} from '../logic/effects/slotManager';
+import { DEFAULT_BATTLE_CONFIG } from '../logic/battle/types';
+import type { RewardOption } from '../logic/rewards/types';
 import {
   applyCardArrived,
   applyCardExited,
   applyCardOutcome,
+  applyPreviewReplacement,
   createAdventureState,
   getEnvForParticipation,
   TOTAL_PARTICIPATION_CARDS,
@@ -23,6 +38,7 @@ import {
   type AdventureState,
   type CardOutcome,
 } from './adventure';
+import type { CardDef } from './cards';
 
 export { TOTAL_PARTICIPATION_CARDS };
 
@@ -45,6 +61,21 @@ export type StatRollResult = {
   dominant: 'hp' | 'attack' | 'defense' | null;
 };
 
+/** 미션템 수집 인벤토리 (§4-6, §4-9) */
+export type HeroMissionInventory = {
+  shining: number;
+  normal: number;
+  broken: number;
+  totalCollected: number;
+};
+
+export const INITIAL_MISSION_INVENTORY: HeroMissionInventory = {
+  shining: 0,
+  normal: 0,
+  broken: 0,
+  totalCollected: 0,
+};
+
 export type GameState = {
   phase: GamePhase;
   /** 스탯 굴림 결과. statRoll 단계부터 존재 */
@@ -59,6 +90,18 @@ export type GameState = {
   timeOfDay: TimeOfDay;
   /** 카드 길 진행 상태. adventure 단계부터 존재 */
   adventure: AdventureState | null;
+  /** 용사 영구/임시 효과 및 실시간 스탯 (§4-7) */
+  heroEffects: HeroEffectState | null;
+  /** 미션템 수집 현황 (§4-6, §4-9) */
+  missionInventory: HeroMissionInventory;
+  /** 몹에게 가한 총 유효 피해량 (§4-10) */
+  totalMobDamage: number;
+  /** 스코어템으로 획득한 보너스 점수 (§4-10) */
+  scoreItemPoints: number;
+  /** 미션 달성 후 귀가 질문 대기 상태 (§4-9) */
+  returnPromptPending: boolean;
+  /** 마지막으로 귀가 질문을 표시했을 때의 미션템 총 수집량 (§4-9, I-04) */
+  lastPromptedMissionCount: number;
 };
 
 export function createInitialState(): GameState {
@@ -70,6 +113,12 @@ export function createInitialState(): GameState {
     participationCount: 0,
     timeOfDay: 'day',
     adventure: null,
+    heroEffects: null,
+    missionInventory: INITIAL_MISSION_INVENTORY,
+    totalMobDamage: 0,
+    scoreItemPoints: 0,
+    returnPromptPending: false,
+    lastPromptedMissionCount: 0,
   };
 }
 
@@ -147,6 +196,7 @@ export function applyDepart(
     regionOrder: [...regionOrder],
     participationCount: 0,
     timeOfDay: 'day',
+    heroEffects: state.roll ? createInitialHeroEffectState(state.roll.heroStats) : null,
   };
 }
 
@@ -182,6 +232,7 @@ export function applyAdventureArrived(state: GameState): GameState {
 export function applyAdventureOutcome(
   state: GameState,
   outcome: CardOutcome,
+  previewReplacement: CardDef | null = null,
 ): GameState {
   if (state.phase !== 'adventure' || !state.adventure) return state;
   const result = applyCardOutcome(
@@ -190,18 +241,189 @@ export function applyAdventureOutcome(
     state.participationCount,
   );
   if (result.adventure === state.adventure) return state;
+  const updatedAdventure = applyPreviewReplacement(
+    result.adventure,
+    previewReplacement,
+  );
   return {
     ...state,
-    adventure: result.adventure,
+    adventure: updatedAdventure,
     participationCount: state.participationCount + result.delta,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 작업 04: 보상·효과·미션 수집 상태 전이
+// ---------------------------------------------------------------------------
+
+/** 보상 선택 적용 (즉시 적용 후 소멸, 인벤토리 없음) §4-6, §4-7 */
+export function applyRewardChoice(
+  state: GameState,
+  option: RewardOption,
+): GameState {
+  if (!state.heroEffects) return state;
+
+  let nextEffects = { ...state.heroEffects };
+  let nextScoreItemPoints = state.scoreItemPoints;
+
+  const role = state.roll?.dominant ?? 'balanced';
+
+  if (option.type === 'permanent' && option.stat) {
+    nextEffects = applyPermanentEffect(nextEffects, {
+      stat: option.stat,
+      value: option.value,
+    });
+  } else if (option.type === 'combat' && option.combatKind) {
+    const specValue = applyRoleSpecializationToCombatValue(
+      option.combatKind,
+      option.value,
+      role,
+    );
+    nextEffects = applyCombatSlotEffect(nextEffects, {
+      id: option.id,
+      name: option.name,
+      kind: option.combatKind,
+      grade: option.grade === 'broken' ? 'broken' : 'normal',
+      value: specValue,
+      remainingTurns: option.duration ?? 20,
+      maxTurns: option.duration ?? 20,
+    });
+  } else if (option.type === 'vital' && option.vitalKind) {
+    const specValue = applyRoleSpecializationToVitalValue(
+      option.vitalKind,
+      option.value,
+      role,
+    );
+    nextEffects = applyVitalEffect(nextEffects, {
+      kind: option.vitalKind,
+      name: option.name,
+      value: specValue,
+      duration: option.duration,
+    });
+  } else if (option.type === 'score') {
+    nextScoreItemPoints += option.value;
+  }
+
+  return {
+    ...state,
+    heroEffects: nextEffects,
+    scoreItemPoints: nextScoreItemPoints,
+  };
+}
+
+/** E1 전투 승리 직후 자연회복 1회 적용 (패배 시 미적용) */
+export function applyBattleVictoryNaturalRecovery(state: GameState): GameState {
+  if (!state.heroEffects || state.heroEffects.isDead) return state;
+  const hpStat =
+    state.roll?.points.hp ?? Math.round(state.heroEffects.baseMaxHp / HP_PER_POINT);
+  const { nextState } = applyPostBattleNaturalRecovery(
+    state.heroEffects,
+    hpStat,
+    DEFAULT_BATTLE_CONFIG.naturalRecoveryMult,
+    DEFAULT_BATTLE_CONFIG.dotBoostMult,
+  );
+  return {
+    ...state,
+    heroEffects: nextState,
+  };
+}
+
+/** 미션템 자동 수집 적용 (§4-6, §4-9) */
+export function applyMissionItemCollected(
+  state: GameState,
+  quality: ItemGrade,
+): GameState {
+  const cur = state.missionInventory;
+  const nextInventory: HeroMissionInventory = {
+    ...cur,
+    [quality]: cur[quality] + 1,
+    totalCollected: cur.totalCollected + 1,
+  };
+
+  return {
+    ...state,
+    missionInventory: nextInventory,
+  };
+}
+
+/** 몹에게 준 실제 피해량 누적 (§4-10) */
+export function applyMobDamageRecorded(
+  state: GameState,
+  damage: number,
+): GameState {
+  return {
+    ...state,
+    totalMobDamage: state.totalMobDamage + damage,
+  };
+}
+
+/** 행동 종료 틱 처리 (도트 적용, 지속시간 차감) §4-7 */
+export function applyEffectsTick(state: GameState): GameState {
+  if (!state.heroEffects) return state;
+  return {
+    ...state,
+    heroEffects: tickEffects(state.heroEffects),
+  };
+}
+
+/** 미션 목표 수량 달성 여부 확인 */
+export function isMissionGoalReached(state: GameState): boolean {
+  if (!state.missionId) return false;
+  const context = getMissionContext(state.missionId);
+  if (!context) return false;
+  return state.missionInventory.totalCollected >= context.mission.count;
+}
+
+/** 귀가 질문 모달 상태 변경 */
+export function setReturnPromptPending(
+  state: GameState,
+  pending: boolean,
+): GameState {
+  return {
+    ...state,
+    returnPromptPending: pending,
+    // 귀가 질문 팝업이 활성화될 때 현재 수량을 마지막 질문 수량으로 기록 (§4-9, I-04)
+    lastPromptedMissionCount: pending
+      ? state.missionInventory.totalCollected
+      : state.lastPromptedMissionCount,
+  };
+}
+
+/** 귀가 결정 적용: 귀가 시 runEnd(컴플릿)로 전이, 계속 시 모험 유지 (§4-9) */
+export function applyReturnDecision(
+  state: GameState,
+  decision: 'return' | 'continue',
+): GameState {
+  if (decision === 'return') {
+    return {
+      ...state,
+      phase: 'runEnd',
+      returnPromptPending: false,
+    };
+  }
+  return {
+    ...state,
+    returnPromptPending: false,
   };
 }
 
 /**
  * 후속 연결 지점(mission-return-check): 카드 결과·보상 처리 뒤, 카드가 버려지기 직전에
- * 미션 달성 여부에 따라 귀가를 묻는 자리(§4-9). 이번 작업은 항상 'continue'.
+ * 미션 달성 여부에 따라 귀가를 묻는 자리(§4-9).
+ * - 30번째 카드가 아니고, 미션 요구량을 '최초 달성한 순간' 또는 '달성 이후 추가 획득할 때마다' 질문 (I-04)
  */
-export function missionReturnCheck(_state: GameState): 'continue' {
+export function missionReturnCheck(state: GameState): 'continue' | 'prompt-return' {
+  // 30번째 참여 카드에서는 질문 없이 바로 완주 (§4-9)
+  if (state.participationCount >= TOTAL_PARTICIPATION_CARDS) {
+    return 'continue';
+  }
+  // 미션 목표 수량을 달성했고, 마지막 질문 이후 미션템을 추가 획득한 경우에만 질문 (§4-9, I-04)
+  if (
+    isMissionGoalReached(state) &&
+    state.missionInventory.totalCollected > state.lastPromptedMissionCount
+  ) {
+    return 'prompt-return';
+  }
   return 'continue';
 }
 

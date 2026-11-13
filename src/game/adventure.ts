@@ -180,13 +180,56 @@ export function planAdvance(
     );
   }
 
+  const refillEnv =
+    getEnvForParticipation(
+      completedParticipation + adventure.preview.length,
+      regionOrder,
+    ) ?? env;
+  const refillPool = buildCardPool(refillEnv.timeOfDay);
   const tailBaseId =
     adventure.preview[adventure.preview.length - 1]?.def.baseId ??
     replacement?.baseId ??
     lastBaseId;
-  const refill = drawCardDef(pool, rng, [tailBaseId], weights);
+  const refill = drawCardDef(refillPool, rng, [tailBaseId], weights);
 
   return { kind: 'next-card', env, replacement, refill };
+}
+
+/**
+ * 전투·이벤트 종료 직후(전진 애니메이션 시작 전), 다음 시간대에 대해 preview[0]의
+ * 시간대 적합성을 검사하고 부적합 시 적합한 카드를 추첨한다.
+ */
+export function planPreviewSuitability(
+  nextEnv: CardEnv | null,
+  adventure: AdventureState,
+  rng: Rng,
+  weights: CardWeights = DEFAULT_CARD_WEIGHTS,
+): CardDef | null {
+  if (!nextEnv) return null;
+  const next = adventure.preview[0];
+  if (!next) return null;
+  const lastBaseId = adventure.active?.def.baseId ?? adventure.lastBaseId;
+  if (isCardSuitable(next.def, nextEnv.timeOfDay) && next.def.baseId !== lastBaseId) {
+    return null;
+  }
+  const pool = buildCardPool(nextEnv.timeOfDay);
+  const after = adventure.preview[1];
+  return drawCardDef(pool, rng, [lastBaseId, after?.def.baseId], weights);
+}
+
+/**
+ * 전진 애니메이션 시작 전, preview[0]의 카드 정의만 교체한다(instanceId 유지).
+ */
+export function applyPreviewReplacement(
+  adv: AdventureState,
+  replacement: CardDef | null,
+): AdventureState {
+  if (!replacement || adv.preview.length === 0) return adv;
+  const [first, ...rest] = adv.preview;
+  return {
+    ...adv,
+    preview: [{ ...first, def: replacement }, ...rest],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +358,7 @@ export function applyCardExited(
     return { kind: 'ignored', adventure: adv };
   }
   const nextActive = plan.replacement
-    ? makeInstance(id++, plan.replacement, plan.env)
+    ? { ...nextRaw, def: plan.replacement, env: plan.env }
     : { ...nextRaw, env: plan.env };
   const refill = makeInstance(id++, plan.refill, null);
 

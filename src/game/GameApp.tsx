@@ -3,7 +3,9 @@ import type { Rng } from '../logic/rng';
 import {
   drawAdventureStart,
   getEnvForParticipation,
+  participationDelta,
   planAdvance,
+  planPreviewSuitability,
   type CardOutcomeKind,
 } from './adventure';
 import { useFrameScale } from './frame';
@@ -11,19 +13,30 @@ import {
   applyAdventureArrived,
   applyAdventureExited,
   applyAdventureOutcome,
+  applyBattleVictoryNaturalRecovery,
   applyConfirmStats,
   applyDepart,
   applyEnterAdventure,
+  applyMissionItemCollected,
+  applyMobDamageRecorded,
   applyReroll,
+  applyReturnDecision,
+  applyRewardChoice,
   applyStartStatRoll,
   createInitialState,
   drawMissionId,
   drawRegionOrder,
   drawStatRoll,
   getMissionContext,
+  isMissionGoalReached,
   missionReturnCheck,
+  setReturnPromptPending,
   type GameState,
 } from './gameState';
+import { computeMissionCardWeights } from './cards';
+import type { RewardOption } from '../logic/rewards/types';
+import type { HeroEffectState } from '../logic/effects/types';
+import type { ItemGrade } from '../render/types';
 import { AdventureReadyScreen } from './screens/AdventureReadyScreen';
 import { AdventureScreen } from './screens/AdventureScreen';
 import { MissionScreen } from './screens/MissionScreen';
@@ -44,6 +57,10 @@ export type GameAppProps = {
 export function GameApp({ rng = Math.random }: GameAppProps) {
   const [state, setState] = useState<GameState>(createInitialState);
   const scale = useFrameScale();
+
+  const handleRestart = () => {
+    setState(createInitialState());
+  };
 
   const handleStart = () => {
     const roll = drawStatRoll(rng);
@@ -67,12 +84,22 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
 
   // ---- 작업 02: 카드 길 ----
 
+  const getCardWeights = (s: GameState) => {
+    const ctx = s.missionId ? getMissionContext(s.missionId) : null;
+    const goalReached = isMissionGoalReached(s);
+    return computeMissionCardWeights(
+      ctx?.mission.kind,
+      ctx?.mission.targetMobId,
+      goalReached,
+    );
+  };
+
   const handleEnterAdventure = () => {
     const cur = state;
     if (cur.phase !== 'adventureReady' || !cur.regionOrder || cur.adventure) return;
     const env = getEnvForParticipation(cur.participationCount, cur.regionOrder);
     if (!env) return;
-    const start = drawAdventureStart(env, rng);
+    const start = drawAdventureStart(env, rng, getCardWeights(cur));
     setState((prev) => applyEnterAdventure(prev, start));
   };
 
@@ -81,7 +108,140 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
   };
 
   const handleCardOutcome = (kind: CardOutcomeKind) => {
-    setState((prev) => applyAdventureOutcome(prev, { kind }));
+    const cur = state;
+    const nextParticipation = cur.participationCount + participationDelta(kind);
+    const nextEnv = cur.regionOrder
+      ? getEnvForParticipation(nextParticipation, cur.regionOrder)
+      : null;
+    const previewReplacement =
+      cur.phase === 'adventure' && cur.adventure && nextEnv
+        ? planPreviewSuitability(nextEnv, cur.adventure, rng, getCardWeights(cur))
+        : null;
+    setState((prev) =>
+      applyAdventureOutcome(prev, { kind }, previewReplacement),
+    );
+  };
+
+  const handleVictoryReward = (
+    reward?: RewardOption,
+    quality?: ItemGrade | null,
+    damage?: number,
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
+  ) => {
+    setState((prev) => {
+      let next = prev;
+      if (typeof damage === 'number' && damage > 0) {
+        next = applyMobDamageRecorded(next, damage);
+      }
+      // 1. 전투 종료 시점의 최종 효과/HP 반영 (§4-7, I-01)
+      if (finalEffects) {
+        next = {
+          ...next,
+          heroEffects: {
+            ...finalEffects,
+            currentHp: finalHp !== undefined ? finalHp : finalEffects.currentHp,
+          },
+        };
+      }
+      // 1-2. E1 전투 승리 직후 자연회복 1회 적용 (도트힐 활성 시 ×1.5 가속)
+      next = applyBattleVictoryNaturalRecovery(next);
+      // 2. 미션템 수집 반영 (§4-6)
+      if (quality) {
+        next = applyMissionItemCollected(next, quality);
+      }
+      // 3. 선택한 보상 적용 (최종 상태 위에 즉시 얹음) (§4-6, §4-7)
+      if (reward) {
+        next = applyRewardChoice(next, reward);
+      }
+      return next;
+    });
+  };
+
+  const handleDefeat = (
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
+  ) => {
+    setState((prev) => {
+      let next = prev;
+      const deadEffects: HeroEffectState = finalEffects
+        ? {
+            ...finalEffects,
+            currentHp: finalHp !== undefined ? Math.max(0, finalHp) : 0,
+            isDead: true,
+          }
+        : prev.heroEffects
+          ? {
+              ...prev.heroEffects,
+              currentHp: 0,
+              isDead: true,
+            }
+          : {
+              baseAttack: prev.roll?.heroStats.attack ?? 10,
+              baseDefense: prev.roll?.heroStats.defense ?? 10,
+              baseMaxHp: prev.roll?.heroStats.maxHp ?? 1000,
+              permanentAttackBonus: 0,
+              permanentDefenseBonus: 0,
+              permanentHpBonus: 0,
+              currentHp: 0,
+              combatSlot: null,
+              vitalSlot: null,
+              isDead: true,
+            };
+
+      next = {
+        ...next,
+        heroEffects: deadEffects,
+      };
+
+      // 참여 카운트 +1 및 카드 로그 반영 (§4-4)
+      if (next.adventure) {
+        next = applyAdventureOutcome(next, { kind: 'participate' });
+      }
+
+      // 전투 패배(사망) 시 정상적인 게임오버 처리 (§4-4, I-01)
+      return {
+        ...next,
+        phase: 'runEnd',
+      };
+    });
+  };
+
+  const handleEffectsTick = (effects: HeroEffectState) => {
+    setState((prev) => ({
+      ...prev,
+      heroEffects: effects,
+    }));
+  };
+
+  const handleReturnDecision = (decision: 'return' | 'continue') => {
+    if (decision === 'return') {
+      setState((prev) => applyReturnDecision(prev, 'return'));
+      return;
+    }
+
+    // decision === 'continue': 귀가 질문 닫고 다음 카드로 전진 (§4-9, I-02)
+    setState((prev) => {
+      const dismissed = applyReturnDecision(prev, 'continue');
+      if (
+        dismissed.phase !== 'adventure' ||
+        !dismissed.adventure ||
+        !dismissed.regionOrder
+      ) {
+        return dismissed;
+      }
+      if (dismissed.adventure.stage === 'closing') {
+        const plan = planAdvance(
+          dismissed.participationCount,
+          dismissed.regionOrder,
+          dismissed.adventure,
+          rng,
+          getCardWeights(dismissed),
+        );
+        return applyAdventureExited(dismissed, plan);
+      }
+      return dismissed;
+    });
   };
 
   // 퇴장 연출 타이머는 closing 단계 렌더에서 걸리므로, 이 핸들러의 state는 결과 입력이 반영된 상태다.
@@ -90,13 +250,20 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
     const cur = state;
     if (cur.phase !== 'adventure' || !cur.adventure || !cur.regionOrder) return;
     if (cur.adventure.stage !== 'closing') return;
-    // 후속 연결 지점: 귀가 질문(mission-return-check). 이번 작업은 항상 continue
-    if (missionReturnCheck(cur) !== 'continue') return;
+
+    // 후속 연결 지점: 귀가 질문(mission-return-check) (§4-9)
+    // 달성 상태이고 30번째 카드가 아니면 귀가 질문 모달 대기
+    if (missionReturnCheck(cur) === 'prompt-return' && !cur.returnPromptPending) {
+      setState((prev) => setReturnPromptPending(prev, true));
+      return;
+    }
+
     const plan = planAdvance(
       cur.participationCount,
       cur.regionOrder,
       cur.adventure,
       rng,
+      getCardWeights(cur),
     );
     setState((prev) => applyAdventureExited(prev, plan));
   };
@@ -113,6 +280,11 @@ export function GameApp({ rng = Math.random }: GameAppProps) {
           onCardArrived: handleCardArrived,
           onCardOutcome: handleCardOutcome,
           onCardExited: handleCardExited,
+          onVictoryReward: handleVictoryReward,
+          onDefeat: handleDefeat,
+          onEffectsTick: handleEffectsTick,
+          onReturnDecision: handleReturnDecision,
+          onRestart: handleRestart,
         })}
       </div>
     </div>
@@ -128,6 +300,20 @@ type ScreenHandlers = {
   onCardArrived: () => void;
   onCardOutcome: (kind: CardOutcomeKind) => void;
   onCardExited: () => void;
+  onVictoryReward: (
+    reward?: RewardOption,
+    quality?: ItemGrade | null,
+    damage?: number,
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
+  ) => void;
+  onDefeat: (
+    finalHp?: number,
+    finalEffects?: HeroEffectState | null,
+  ) => void;
+  onEffectsTick: (effects: HeroEffectState) => void;
+  onReturnDecision: (decision: 'return' | 'continue') => void;
+  onRestart: () => void;
 };
 
 function renderScreen(state: GameState, handlers: ScreenHandlers) {
@@ -173,9 +359,12 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
     }
 
     case 'adventure': {
-      if (!state.adventure || !state.regionOrder) {
+      if (!state.adventure || !state.regionOrder || !state.roll) {
         return <StateError phase={state.phase} />;
       }
+      const context = state.missionId
+        ? getMissionContext(state.missionId)
+        : null;
       const fallbackEnv =
         getEnvForParticipation(
           Math.min(state.participationCount, 29),
@@ -186,22 +375,44 @@ function renderScreen(state: GameState, handlers: ScreenHandlers) {
         <AdventureScreen
           adventure={state.adventure}
           participationCount={state.participationCount}
+          heroStats={state.roll.heroStats}
+          heroRole={state.roll.dominant ?? 'balanced'}
+          heroEffects={state.heroEffects}
+          missionContext={context}
+          missionInventory={state.missionInventory}
+          returnPromptPending={state.returnPromptPending}
           fallbackEnv={fallbackEnv}
           onArrived={handlers.onCardArrived}
           onOutcome={handlers.onCardOutcome}
           onExited={handlers.onCardExited}
+          onVictoryReward={handlers.onVictoryReward}
+          onDefeat={handlers.onDefeat}
+          onEffectsTick={handlers.onEffectsTick}
+          onReturnDecision={handlers.onReturnDecision}
         />
       );
     }
 
-    case 'runEnd':
+    case 'runEnd': {
       if (!state.adventure) return <StateError phase={state.phase} />;
+      const context = state.missionId
+        ? getMissionContext(state.missionId)
+        : null;
       return (
         <RunEndScreen
           participationCount={state.participationCount}
           adventure={state.adventure}
+          heroDead={state.heroEffects?.isDead ?? false}
+          totalMobDamage={state.totalMobDamage}
+          scoreItemPoints={state.scoreItemPoints}
+          missionContext={context}
+          missionInventory={state.missionInventory}
+          heroStats={state.roll?.heroStats ?? null}
+          heroEffects={state.heroEffects}
+          onRestart={handlers.onRestart}
         />
       );
+    }
   }
 }
 
